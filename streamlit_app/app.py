@@ -42,7 +42,7 @@ elif menu == "EDA":
 
     rutas = {
         "Original": "data/data6.csv",
-        "Limpio": "data/data6_limpio.csv",
+        "Limpio": "data/data6_limpio.csv", 
         "Corregido": "data/raw/data6_corregido.csv",
         "Con features": "data/features/data6_features.csv"
     }
@@ -51,39 +51,164 @@ elif menu == "EDA":
     try:
         df = pd.read_csv(ruta)
         st.subheader(f"EDA - Datos {tipo_eda.lower()}")
-        st.write("Vista general:")
+        
+        # VISTA GENERAL PARA TODOS
+        st.write("### Vista general:")
         st.dataframe(df.head())
-
-        st.write("Estadísticas descriptivas:")
+        
+        st.write("### Estadísticas descriptivas:")
         st.write(df.describe())
-
-        st.write("Valores nulos:")
-        st.write(df.isnull().sum())
-
-        st.write("Correlaciones:")
-        fig1, ax1 = plt.subplots(figsize=(10, 6))
-        sns.heatmap(df.select_dtypes(include="number").corr(), annot=True, cmap="viridis", ax=ax1)
-        st.pyplot(fig1)
-
-        st.write("Distribuciones:")
-        df.select_dtypes(include="number").hist(figsize=(12, 8))
-        st.pyplot(plt)
-
-        if "frecuencia_mensual" in df.columns:
-            st.write("Frecuencia mensual de compra:")
-            fig3, ax3 = plt.subplots()
-            sns.histplot(df["frecuencia_mensual"].dropna(), bins=30, kde=True, ax=ax3)
-            st.pyplot(fig3)
-
-        if "variabilidad_monto_cliente" in df.columns and "segmento_comportamiento" in df.columns:
-            st.write("Variabilidad del monto por segmento:")
-            fig4, ax4 = plt.subplots()
-            sns.boxplot(x="segmento_comportamiento", y="variabilidad_monto_cliente", data=df, ax=ax4)
-            ax4.set_xticklabels(ax4.get_xticklabels(), rotation=45)
-            st.pyplot(fig4)
+        
+        st.write("### Valores nulos:")
+        nulos = df.isnull().sum()
+        st.write(nulos)
+        
+        # CONTENIDO ESPECÍFICO POR TIPO DE EDA
+        if tipo_eda == "Original":
+            st.info("""
+            **Dataset Original** - Datos sin procesar directamente de la fuente.
+            Contiene valores nulos, inconsistencias y datos sin transformar.
+            """)
+            
+        elif tipo_eda == "Limpio":
+            st.success("""
+            **RESUMEN DE LIMPIEZA APLICADA:**
+            - ✓ Valores nulos: ELIMINADOS (0 restantes)
+            - ✓ Valores negativos: ELIMINADOS en cantidad, precio, variables climáticas
+            - ✓ Rangos lógicos: ESTABLECIDOS (humedad 0-100%, viento ≥0, etc.)
+            - ✓ Valores extremos: CORREGIDOS (gasto publicidad, inflación)
+            - ✓ Fechas: CONVERTIDAS a datetime
+            - ✓ Dataset listo para análisis avanzado
+            """)
+            
+            # Gráficas específicas para datos limpios
+            if "cantidad" in df.columns:
+                st.write("### Distribución de Cantidad (Post-Limpieza)")
+                fig, ax = plt.subplots(figsize=(10, 4))
+                df["cantidad"].hist(bins=30, ax=ax, color='lightgreen')
+                ax.set_title('Distribución de Cantidad - Datos Limpios')
+                ax.set_xlabel('Cantidad')
+                ax.set_ylabel('Frecuencia')
+                st.pyplot(fig)
+                
+        elif tipo_eda == "Corregido":
+            st.warning("""
+            **MEJORAS INCORPORADAS:**
+            - • Métodos de pago unificados y consistentes
+            - • Tamaños de pedido categorizados  
+            - • Variables climáticas normalizadas
+            - • Fechas convertidas a datetime
+            - • Valores extremos manejados
+            """)
+            
+            # Análisis de variables numéricas corregidas
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            
+            if len(numeric_cols) > 0:
+                st.write("### Variables Numéricas (Corregidas)")
+                # Seleccionar primeras 4 variables numéricas para mostrar
+                cols_to_show = numeric_cols[:4] if len(numeric_cols) >= 4 else numeric_cols
+                
+                fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+                axes = axes.ravel()
+                
+                for i, col in enumerate(cols_to_show):
+                    if i < len(axes):
+                        df[col].hist(bins=20, ax=axes[i], color='lightblue')
+                        axes[i].set_title(f'Distribución de {col}')
+                        axes[i].set_xlabel(col)
+                        axes[i].set_ylabel('Frecuencia')
+                
+                # Ocultar ejes vacíos
+                for i in range(len(cols_to_show), len(axes)):
+                    axes[i].set_visible(False)
+                    
+                plt.tight_layout()
+                st.pyplot(fig)
+            
+            # Análisis de variables categóricas corregidas
+            categorical_cols = df.select_dtypes(include=['object']).columns
+            
+            if len(categorical_cols) > 0:
+                st.write("### Variables Categóricas (Corregidas)")
+                # Seleccionar primeras 2 variables categóricas para mostrar
+                cat_cols_to_show = categorical_cols[:2] if len(categorical_cols) >= 2 else categorical_cols
+                
+                for col in cat_cols_to_show:
+                    value_counts = df[col].value_counts().head(10)  # Top 10 categorías
+                    if len(value_counts) > 0:
+                        fig, ax = plt.subplots(figsize=(10, 4))
+                        value_counts.plot(kind='bar', ax=ax, color='orange')
+                        ax.set_title(f'Distribución de {col}')
+                        ax.set_xlabel(col)
+                        ax.set_ylabel('Frecuencia')
+                        plt.xticks(rotation=45)
+                        st.pyplot(fig)
+                        
+        elif tipo_eda == "Con features":
+            st.success("""
+            **Dataset con Features de Ingeniería** - Contiene variables creadas para el modelamiento:
+            - Comportamiento del cliente (frecuencia, antigüedad, valor promedio)
+            - Segmentación (comportamiento, tipo cliente)
+            - Variables temporales (estación, día de semana)
+            - Métricas de consistencia
+            """)
+            
+            # Mostrar features creadas específicamente
+            engineered_features = [
+                'frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente',
+                'variabilidad_monto_cliente', 'consistencia_metodo_pago',
+                'segmento_comportamiento', 'producto_favorito_cliente',
+                'es_fin_de_semana', 'estacion', 'dia_semana_num'
+            ]
+            
+            features_presentes = [f for f in engineered_features if f in df.columns]
+            
+            if features_presentes:
+                st.write("### Features de Ingeniería Creadas")
+                
+                # Mostrar estadísticas de las features más importantes
+                important_features = features_presentes[:6]  # Mostrar primeras 6
+                
+                fig, axes = plt.subplots(2, 3, figsize=(15, 8))
+                axes = axes.ravel()
+                
+                for i, feature in enumerate(important_features):
+                    if i < len(axes):
+                        df[feature].hist(bins=20, ax=axes[i], color='purple', alpha=0.7)
+                        axes[i].set_title(feature)
+                        axes[i].set_xlabel('Valor')
+                        axes[i].set_ylabel('Frecuencia')
+                
+                # Ocultar ejes vacíos
+                for i in range(len(important_features), len(axes)):
+                    axes[i].set_visible(False)
+                    
+                plt.tight_layout()
+                st.pyplot(fig)
+                
+                # Mostrar descripción de las features
+                st.write("**Descripción de Features:**")
+                feature_descriptions = {
+                    'frecuencia_mensual': 'Número de compras mensuales del cliente',
+                    'antiguedad_meses': 'Tiempo como cliente en meses',
+                    'valor_promedio_cliente': 'Gasto promedio por transacción',
+                    'variabilidad_monto_cliente': 'Consistencia en montos gastados',
+                    'consistencia_metodo_pago': 'Estabilidad en métodos de pago',
+                    'segmento_comportamiento': 'Segmento según comportamiento de compra',
+                    'producto_favorito_cliente': 'Producto más comprado por el cliente',
+                    'es_fin_de_semana': 'Indica si la compra fue en fin de semana',
+                    'estacion': 'Estación del año de la compra',
+                    'dia_semana_num': 'Día de la semana (numérico)'
+                }
+                
+                for feature in features_presentes:
+                    if feature in feature_descriptions:
+                        st.write(f"• **{feature}**: {feature_descriptions[feature]}")
 
     except Exception as e:
         st.error(f"No se pudo cargar el archivo: {e}")
+        st.write("Asegúrate de que los archivos de datos existan en las rutas especificadas.")
 
 # Sección: Modelos
 elif menu == "Modelos":
