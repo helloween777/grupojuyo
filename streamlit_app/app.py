@@ -161,26 +161,13 @@ elif menu == "Modelos":
                 features_esperadas = features_por_modelo['producto']
                 datos_muestra = datos_completos[features_esperadas].head(100).copy()
                 
-                # Solución simple: recrear el DataFrame para asegurar 1D
-                datos_muestra_clean = pd.DataFrame()
-                for col in datos_muestra.columns:
-                    datos_muestra_clean[col] = datos_muestra[col].values
-                
-                datos_muestra = datos_muestra_clean
-                
-                # Procesar tipos de datos
+                # SOLUCIÓN SIMPLE: Solo convertir tipos básicos sin procesamiento complejo
                 categorical_cols = ['tipo_cliente', 'producto_favorito_cliente', 
                                   'metodo_pago_habitual', 'segmento_comportamiento', 'estacion']
                 
                 for col in categorical_cols:
                     if col in datos_muestra.columns:
                         datos_muestra[col] = datos_muestra[col].astype('category')
-                
-                numeric_cols = ['frecuencia_mensual', 'valor_promedio_cliente', 
-                              'antiguedad_meses', 'dia_semana_num']
-                for col in numeric_cols:
-                    if col in datos_muestra.columns:
-                        datos_muestra[col] = datos_muestra[col].astype('float32')
                 
                 # Predecir
                 with st.spinner('Calculando predicciones de producto...'):
