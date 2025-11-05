@@ -6,6 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
+from sklearn.ensemble import RandomForestRegressor
+st.write("RandomForestRegressor disponible.")
 
 st.set_page_config(page_title="Grupo Juyo", layout="wide")
 sns.set(style="whitegrid")
