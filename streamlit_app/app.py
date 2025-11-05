@@ -102,25 +102,31 @@ elif menu == "Modelos":
         with open(modelo_path, "rb") as f:
             modelo = pickle.load(f)
 
-        df = pd.read_csv("data/features/data6_features.csv")
+        # Verificación del tipo de objeto cargado
+        if not hasattr(modelo, "predict"):
+            st.error(f"El archivo '{modelo_path}' no contiene un modelo válido. Tipo: {type(modelo)}")
+        else:
+            df = pd.read_csv("data/features/data6_features.csv")
 
-        st.write("Datos de entrada:")
-        st.dataframe(df.head())
+            st.write("Datos de entrada:")
+            st.dataframe(df.head())
 
-        pred = modelo.predict(df)
+            pred = modelo.predict(df)
 
-        st.write(f"Predicciones para: {seleccion}")
-        st.write(pred)
+            st.write(f"Predicciones para: {seleccion}")
+            st.write(pred)
 
-        if seleccion == "Cantidad comprada":
-            st.bar_chart(pred)
-        elif seleccion == "Día de compra":
-            st.bar_chart(pd.Series(pred).value_counts().sort_index())
-        elif seleccion == "Producto comprado":
-            st.write("Distribución de productos:")
-            st.bar_chart(pd.Series(pred).value_counts())
-        elif seleccion == "Probabilidad de compra":
-            st.line_chart(pred)
+            if seleccion == "Cantidad comprada":
+                st.bar_chart(pred)
+            elif seleccion == "Día de compra":
+                st.bar_chart(pd.Series(pred).value_counts().sort_index())
+            elif seleccion == "Producto comprado":
+                st.write("Distribución de productos:")
+                st.bar_chart(pd.Series(pred).value_counts())
+            elif seleccion == "Probabilidad de compra":
+                st.line_chart(pred)
 
+    except FileNotFoundError:
+        st.error(f"No se encontró el archivo: {modelo_path}")
     except Exception as e:
         st.error(f"No se pudo cargar el modelo: {e}")
