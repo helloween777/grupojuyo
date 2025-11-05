@@ -93,17 +93,30 @@ elif menu == "Modelos":
     @st.cache_data
     def cargar_datos():
         df = pd.read_csv("data/features/data6_features.csv")
-        # Features para diferentes modelos
-        features_compro = ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
-                          'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago']
-        return df, features_compro
+        
+        # Features para CADA modelo por separado:
+        features_por_modelo = {
+            'compro': ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
+                      'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago'],
+            'dia_compra': ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
+                          'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago'],
+            'producto': [
+                'tipo_cliente', 'frecuencia_mensual', 'valor_promedio_cliente',
+                'producto_favorito_cliente', 'metodo_pago_habitual', 'segmento_comportamiento',
+                'antiguedad_meses', 'dia_semana_num', 'estacion'
+            ],
+            'cantidad': ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
+                        'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago']
+        }
+        
+        return df, features_por_modelo
     
     @st.cache_resource
     def cargar_modelo(modelo_path):
         with open(modelo_path, "rb") as f:
             return pickle.load(f)
     
-    datos_completos, features_compro = cargar_datos()
+    datos_completos, features_por_modelo = cargar_datos()
     
     modelos_disponibles = {
         "Probabilidad de compra": "models/mejor_modelo_compro.pkl",
@@ -118,29 +131,48 @@ elif menu == "Modelos":
         modelo_path = modelos_disponibles[seleccion]
 
         try:
-            modelo = cargar_modelo(modelo_path)
+            # CARGAR DATOS ESPECÍFICOS PARA CADA MODELO
+            if seleccion == "Probabilidad de compra":
+                datos_muestra = datos_completos[features_por_modelo['compro']].head(100)
+            elif seleccion == "Día de compra":
+                datos_muestra = datos_completos[features_por_modelo['dia_compra']].head(100)
+            elif seleccion == "Producto comprado":
+                datos_muestra = datos_completos[features_por_modelo['producto']].head(100)
+            elif seleccion == "Cantidad comprada":
+                datos_muestra = datos_completos[features_por_modelo['cantidad']].head(100)
             
-            # Usar solo 100 filas para mejor rendimiento
-            datos_muestra = datos_completos[features_compro].head(100)
-            
-            with st.spinner('Calculando predicciones...'):
-                # PREDICCIÓN ESPECÍFICA PARA CADA MODELO
-                if seleccion == "Producto comprado":
-                    # Para CatBoost: convertir datos al tipo correcto y NO usar cat_features
-                    datos_muestra = datos_muestra.astype({
-                        'frecuencia_mensual': 'float32',
-                        'antiguedad_meses': 'int32', 
-                        'valor_promedio_cliente': 'float32',
-                        'es_fin_de_semana': 'int32',
-                        'variabilidad_monto_cliente': 'float32',
-                        'consistencia_metodo_pago': 'int32'
-                    })
-                    pred = modelo.predict(datos_muestra)
-                    pred_proba = modelo.predict_proba(datos_muestra)
+            # CARGAR Y USAR MODELO
+            if seleccion == "Producto comprado":
+                # Para CatBoost: cargar modelo COMPLETO con cat_features
+                modelo_data = cargar_modelo(modelo_path)
+                modelo = modelo_data['model']
+                cat_features = modelo_data['cat_features']
+                
+                # Asegurar tipos de datos correctos
+                datos_muestra = datos_muestra.astype({
+                    'tipo_cliente': 'int32',
+                    'frecuencia_mensual': 'float32',
+                    'valor_promedio_cliente': 'float32', 
+                    'producto_favorito_cliente': 'int32',
+                    'metodo_pago_habitual': 'int32',
+                    'segmento_comportamiento': 'int32',
+                    'antiguedad_meses': 'int32',
+                    'dia_semana_num': 'int32',
+                    'estacion': 'int32'
+                })
+                
+                # Predecir CON cat_features
+                with st.spinner('Calculando predicciones de producto...'):
+                    pred = modelo.predict(datos_muestra, cat_features=cat_features)
+                    pred_proba = modelo.predict_proba(datos_muestra, cat_features=cat_features)
                     # Para multiclase, usar la probabilidad máxima como score
                     pred_proba = np.max(pred_proba, axis=1)
-                else:
-                    # Para modelos binarios
+                    
+            else:
+                # Para otros modelos (carga normal)
+                modelo = cargar_modelo(modelo_path)
+                
+                with st.spinner('Calculando predicciones...'):
                     pred = modelo.predict(datos_muestra)
                     if hasattr(modelo, 'predict_proba'):
                         pred_proba = modelo.predict_proba(datos_muestra)[:, 1]
@@ -177,8 +209,8 @@ elif menu == "Modelos":
                 ax.set_xlabel('Probabilidad de Compra')
                 ax.set_title('Distribución de Probabilidades de Compra')
             elif seleccion == "Producto comprado":
-                ax.set_xlabel('Probabilidad del Producto Predicho')
-                ax.set_title('Distribución de Probabilidades del Producto')
+                ax.set_xlabel('Confianza del Producto Predicho')
+                ax.set_title('Distribución de Confianza en Predicciones de Producto')
             else:
                 ax.set_xlabel('Probabilidad')
                 ax.set_title('Distribución de las Predicciones')
@@ -364,7 +396,7 @@ elif menu == "Modelos":
             else:
                 df_predicciones = pd.DataFrame({
                     'Probabilidad': pred_proba[:10],
-                    'Predicción': pred_proba[:10]
+                    'Predicción': pred[:10]
                 })
             
             st.dataframe(df_predicciones)
