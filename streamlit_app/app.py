@@ -1,90 +1,3 @@
-# -*- coding: utf-8 -*-
-# streamlit_app/app.py
-
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import pickle
-from sklearn.ensemble import RandomForestRegressor
-
-st.write("RandomForestRegressor disponible.")
-
-st.set_page_config(page_title="Grupo Juyo", layout="wide")
-sns.set(style="whitegrid")
-plt.switch_backend("Agg")
-
-# Carátula
-st.image("streamlit_app/assets/portada_juyo.png", use_column_width=True)
-st.title("Modelamiento Grupo Juyo")
-
-# Menú lateral
-menu = st.sidebar.radio("Menú principal", ["Mapa", "EDA", "Modelos"])
-
-# Sección: Mapa
-if menu == "Mapa":
-    st.subheader("Distribución geográfica de gaseosas")
-    try:
-        df_mapa = pd.read_csv("data/raw/data6_corregido.csv")
-        if "coordenadas_envio" in df_mapa.columns:
-            coords = df_mapa["coordenadas_envio"].dropna().str.extract(r"\((.*),\s*(.*)\)")
-            coords.columns = ["lat", "lon"]
-            coords = coords.astype(float)
-            st.map(coords)
-        else:
-            st.warning("No se encontraron coordenadas en la data corregida.")
-    except Exception as e:
-        st.error(f"No se pudo cargar el mapa: {e}")
-
-# Sección: EDA
-elif menu == "EDA":
-    tipo_eda = st.radio("Tipo de EDA", ["Original", "Limpio", "Corregido", "Con features"])
-
-    rutas = {
-        "Original": "data/data6.csv",
-        "Limpio": "data/data6_limpio.csv",
-        "Corregido": "data/raw/data6_corregido.csv",
-        "Con features": "data/features/data6_features.csv"
-    }
-
-    ruta = rutas[tipo_eda]
-    try:
-        df = pd.read_csv(ruta)
-        st.subheader(f"EDA - Datos {tipo_eda.lower()}")
-        st.write("Vista general:")
-        st.dataframe(df.head())
-
-        st.write("Estadísticas descriptivas:")
-        st.write(df.describe())
-
-        st.write("Valores nulos:")
-        st.write(df.isnull().sum())
-
-        st.write("Correlaciones:")
-        fig1, ax1 = plt.subplots(figsize=(10, 6))
-        sns.heatmap(df.select_dtypes(include="number").corr(), annot=True, cmap="viridis", ax=ax1)
-        st.pyplot(fig1)
-
-        st.write("Distribuciones:")
-        df.select_dtypes(include="number").hist(figsize=(12, 8))
-        st.pyplot(plt)
-
-        if "frecuencia_mensual" in df.columns:
-            st.write("Frecuencia mensual de compra:")
-            fig3, ax3 = plt.subplots()
-            sns.histplot(df["frecuencia_mensual"].dropna(), bins=30, kde=True, ax=ax3)
-            st.pyplot(fig3)
-
-        if "variabilidad_monto_cliente" in df.columns and "segmento_comportamiento" in df.columns:
-            st.write("Variabilidad del monto por segmento:")
-            fig4, ax4 = plt.subplots()
-            sns.boxplot(x="segmento_comportamiento", y="variabilidad_monto_cliente", data=df, ax=ax4)
-            ax4.set_xticklabels(ax4.get_xticklabels(), rotation=45)
-            st.pyplot(fig4)
-
-    except Exception as e:
-        st.error(f"No se pudo cargar el archivo: {e}")
-
 # Sección: Modelos
 elif menu == "Modelos":
     st.subheader("Predicción con modelos del Grupo Juyo")
@@ -124,11 +37,28 @@ elif menu == "Modelos":
             datos_muestra = datos_completos[features_compro].head(100)
             
             with st.spinner('Calculando predicciones...'):
-                pred = modelo.predict(datos_muestra)
-                if hasattr(modelo, 'predict_proba'):
-                    pred_proba = modelo.predict_proba(datos_muestra)[:, 1]
+                # PREDICCIÓN ESPECÍFICA PARA CADA MODELO
+                if seleccion == "Producto comprado":
+                    # Para CatBoost: convertir datos al tipo correcto y NO usar cat_features
+                    datos_muestra = datos_muestra.astype({
+                        'frecuencia_mensual': 'float32',
+                        'antiguedad_meses': 'int32', 
+                        'valor_promedio_cliente': 'float32',
+                        'es_fin_de_semana': 'int32',
+                        'variabilidad_monto_cliente': 'float32',
+                        'consistencia_metodo_pago': 'int32'
+                    })
+                    pred = modelo.predict(datos_muestra)
+                    pred_proba = modelo.predict_proba(datos_muestra)
+                    # Para multiclase, usar la probabilidad máxima como score
+                    pred_proba = np.max(pred_proba, axis=1)
                 else:
-                    pred_proba = pred
+                    # Para modelos binarios
+                    pred = modelo.predict(datos_muestra)
+                    if hasattr(modelo, 'predict_proba'):
+                        pred_proba = modelo.predict_proba(datos_muestra)[:, 1]
+                    else:
+                        pred_proba = pred
 
             st.success("Predicciones completadas")
             
@@ -159,6 +89,9 @@ elif menu == "Modelos":
             elif seleccion == "Probabilidad de compra":
                 ax.set_xlabel('Probabilidad de Compra')
                 ax.set_title('Distribución de Probabilidades de Compra')
+            elif seleccion == "Producto comprado":
+                ax.set_xlabel('Probabilidad del Producto Predicho')
+                ax.set_title('Distribución de Probabilidades del Producto')
             else:
                 ax.set_xlabel('Probabilidad')
                 ax.set_title('Distribución de las Predicciones')
@@ -179,6 +112,17 @@ elif menu == "Modelos":
                     resultados_umbral.append({
                         'Umbral': umbral,
                         'Clientes Martes': martes_predichos,
+                        'Porcentaje': f'{porcentaje:.1f}%'
+                    })
+            elif seleccion == "Producto comprado":
+                umbrales = [0.1, 0.2, 0.3]
+                resultados_umbral = []
+                for umbral in umbrales:
+                    alta_confianza = (pred_proba > umbral).sum()
+                    porcentaje = (alta_confianza / len(pred_proba)) * 100
+                    resultados_umbral.append({
+                        'Umbral': umbral,
+                        'Clientes Alta Confianza': alta_confianza,
                         'Porcentaje': f'{porcentaje:.1f}%'
                     })
             else:
@@ -207,6 +151,14 @@ elif menu == "Modelos":
                     (0.6, 0.8, 'Probable Martes'),
                     (0.8, 1.01, 'Muy Probable Martes')
                 ]
+            elif seleccion == "Producto comprado":
+                segmentos = [
+                    (0.0, 0.1, 'Muy Baja Confianza'),
+                    (0.1, 0.2, 'Baja Confianza'), 
+                    (0.2, 0.4, 'Confianza Media'),
+                    (0.4, 0.7, 'Alta Confianza'),
+                    (0.7, 1.01, 'Muy Alta Confianza')
+                ]
             else:
                 segmentos = [
                     (0.0, 0.3, 'Baja Probabilidad'),
@@ -230,7 +182,8 @@ elif menu == "Modelos":
 
             # GRÁFICO DE SEGMENTOS
             fig2, ax2 = plt.subplots(figsize=(10, 6))
-            ax2.bar(df_segmentos['Segmento'], df_segmentos['Clientes'], color=['#ff6b6b', '#ffd166', '#06d6a0', '#118ab2', '#073b4c'][:len(segmentos)])
+            ax2.bar(df_segmentos['Segmento'], df_segmentos['Clientes'], 
+                   color=['#ff6b6b', '#ffd166', '#06d6a0', '#118ab2', '#073b4c'][:len(segmentos)])
             ax2.set_ylabel('Número de Clientes')
             ax2.set_title('Distribución de Clientes por Segmento')
             ax2.tick_params(axis='x', rotation=45)
@@ -279,6 +232,10 @@ elif menu == "Modelos":
                     alta_prob = (pred_proba > 0.7).sum()
                     st.write(f"- Clientes con alta probabilidad (>70%): {alta_prob} ({alta_prob/len(pred_proba)*100:.1f}%)")
                     st.write(f"- Confianza promedio: {pred_proba.mean():.1%}")
+                elif seleccion == "Producto comprado":
+                    alta_conf = (pred_proba > 0.4).sum()
+                    st.write(f"- Clientes con alta confianza (>40%): {alta_conf} ({alta_conf/len(pred_proba)*100:.1f}%)")
+                    st.write(f"- Confianza promedio: {pred_proba.mean():.1%}")
                 else:
                     st.write(f"- Clientes objetivo: {len(pred_proba)}")
                     st.write(f"- Probabilidad promedio: {pred_proba.mean():.1%}")
@@ -291,6 +248,9 @@ elif menu == "Modelos":
                 if seleccion == "Día de compra":
                     muy_martes = (pred_proba > 0.8).sum()
                     st.write(f"- Clientes muy seguros de Martes (>80%): {muy_martes}")
+                elif seleccion == "Producto comprado":
+                    muy_seguros = (pred_proba > 0.7).sum()
+                    st.write(f"- Clientes muy seguros (>70%): {muy_seguros}")
                 else:
                     muy_seguros = (pred_proba > 0.9).sum()
                     st.write(f"- Clientes muy seguros (>90%): {muy_seguros}")
@@ -308,6 +268,12 @@ elif menu == "Modelos":
                     'Probabilidad_Compra': pred_proba[:10],
                     'Decisión': ['COMPRA' if p > 0.5 else 'NO COMPRA' for p in pred_proba[:10]]
                 })
+            elif seleccion == "Producto comprado":
+                df_predicciones = pd.DataFrame({
+                    'Confianza_Predicción': pred_proba[:10],
+                    'Producto_Predicho': pred[:10]  # Los productos ya vienen codificados
+                })
+                st.info("Nota: Los productos aparecen codificados (0-9) como durante el entrenamiento")
             else:
                 df_predicciones = pd.DataFrame({
                     'Probabilidad': pred_proba[:10],
@@ -320,5 +286,4 @@ elif menu == "Modelos":
             st.error(f"No se encontró el archivo: {modelo_path}")
         except Exception as e:
             st.error(f"No se pudo cargar el modelo: {e}")
-
 
