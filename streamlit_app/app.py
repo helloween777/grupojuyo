@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-"""app.ipynb"""
-
 # streamlit_app/app.py
 
 import streamlit as st
@@ -65,7 +63,7 @@ elif menu == "EDA":
         st.pyplot(fig1)
 
         st.write("Distribuciones:")
-        fig2 = df.select_dtypes(include="number").hist(figsize=(12, 8))
+        df.select_dtypes(include="number").hist(figsize=(12, 8))
         st.pyplot(plt)
 
         if "frecuencia_mensual" in df.columns:
@@ -102,7 +100,6 @@ elif menu == "Modelos":
         with open(modelo_path, "rb") as f:
             modelo = pickle.load(f)
 
-        # Verificación del tipo de objeto cargado
         if not hasattr(modelo, "predict"):
             st.error(f"El archivo '{modelo_path}' no contiene un modelo válido. Tipo: {type(modelo)}")
         else:
