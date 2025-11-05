@@ -143,10 +143,15 @@ elif menu == "Modelos":
             
             # CARGAR Y USAR MODELO
             if seleccion == "Producto comprado":
-                # Para CatBoost: cargar modelo COMPLETO con cat_features
+                # Cargar el DICCIONARIO completo del modelo
                 modelo_data = cargar_modelo(modelo_path)
+                # Extraer el modelo y cat_features del diccionario
                 modelo = modelo_data['model']
                 cat_features = modelo_data['cat_features']
+                features_esperadas = modelo_data['features']
+
+                # Usar las features ESPECÍFICAS del modelo guardado
+                datos_muestra = datos_completos[features_esperadas].head(100)
                 
                 # Asegurar tipos de datos correctos
                 datos_muestra = datos_muestra.astype({
