@@ -101,21 +101,19 @@ elif menu == "Modelos":
 
     try:
         with open(modelo_path, "rb") as f:
-            modelo = pickle.load(f)
+            contenido = pickle.load(f)
 
-        if not hasattr(modelo, "predict"):
-            st.error(f"El archivo '{modelo_path}' no contiene un modelo válido. Tipo: {type(modelo)}")
-        else:
-            df = pd.read_csv("data/features/data6_features.csv")
+        st.write(f"Tipo de contenido cargado: {type(contenido)}")
+        st.write(f"Forma del contenido: {getattr(contenido, 'shape', 'No tiene forma')}")
 
-            st.write("Datos de entrada:")
-            st.dataframe(df.head())
-
-            pred = modelo.predict(df)
-
+        # Si es un array de numpy, son predicciones ya hechas
+        if hasattr(contenido, 'shape'):
+            st.write("Se cargaron predicciones pre-calculadas")
+            pred = contenido
+            
             st.write(f"Predicciones para: {seleccion}")
             st.write(pred)
-
+            
             if seleccion == "Cantidad comprada":
                 st.bar_chart(pred)
             elif seleccion == "Día de compra":
@@ -125,8 +123,11 @@ elif menu == "Modelos":
                 st.bar_chart(pd.Series(pred).value_counts())
             elif seleccion == "Probabilidad de compra":
                 st.line_chart(pred)
+                
+        else:
+            st.error(f"El archivo no contiene un formato reconocido. Tipo: {type(contenido)}")
 
     except FileNotFoundError:
         st.error(f"No se encontró el archivo: {modelo_path}")
     except Exception as e:
-        st.error(f"No se pudo cargar el modelo: {e}")
+        st.error(f"No se pudo cargar el archivo: {e}")
