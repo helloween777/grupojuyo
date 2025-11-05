@@ -106,7 +106,7 @@ elif menu == "Modelos":
         if not hasattr(modelo, "predict"):
             st.error(f"El archivo '{modelo_path}' no contiene un modelo válido. Tipo: {type(modelo)}")
         else:
-            df = pd.read_csv("../data/features/data6_features.csv")
+            df = pd.read_csv("data/features/data6_features.csv")
 
             st.write("Datos de entrada:")
             st.dataframe(df.head())
