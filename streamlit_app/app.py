@@ -157,22 +157,17 @@ elif menu == "Modelos":
                 # Cargar modelo
                 modelo = cargar_modelo(modelo_path)
                 
-                st.write("DEBUG - Información del modelo cargado:")
-                st.write(f"Tipo del objeto: {type(modelo)}")
-                
                 # Usar las features específicas para producto
                 features_esperadas = features_por_modelo['producto']
                 datos_muestra = datos_completos[features_esperadas].head(100).copy()
                 
                 # Asegurar que las características categóricas sean del tipo correcto
-                # CatBoost maneja automáticamente las cat_features durante predicción
                 categorical_cols = ['tipo_cliente', 'producto_favorito_cliente', 
                                   'metodo_pago_habitual', 'segmento_comportamiento', 'estacion']
                 
                 for col in categorical_cols:
                     if col in datos_muestra.columns:
                         datos_muestra[col] = datos_muestra[col].astype('category')
-                        st.write(f"{col} -> tipo: category")
                 
                 # Las numéricas mantener como float
                 numeric_cols = ['frecuencia_mensual', 'valor_promedio_cliente', 
@@ -180,7 +175,11 @@ elif menu == "Modelos":
                 for col in numeric_cols:
                     if col in datos_muestra.columns:
                         datos_muestra[col] = datos_muestra[col].astype('float32')
-                        st.write(f"{col} -> tipo: float32")
+                
+                # Asegurar que no hay arrays multidimensionales
+                for col in datos_muestra.columns:
+                    if hasattr(datos_muestra[col], 'ndim') and datos_muestra[col].ndim > 1:
+                        datos_muestra[col] = datos_muestra[col].iloc[:, 0]
                 
                 # Predecir SIN cat_features (el modelo ya las conoce)
                 with st.spinner('Calculando predicciones de producto...'):
