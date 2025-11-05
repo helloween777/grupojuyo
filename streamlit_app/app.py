@@ -383,35 +383,9 @@ elif menu == "Modelos":
                     muy_seguros = (pred_proba > 0.9).sum()
                     st.write(f"- Clientes muy seguros (>90%): {muy_seguros}")
 
-            # PREDICCIONES INDIVIDUALES
-            st.write("### Predicciones Individuales (primeras 10)")
-            
-            if seleccion == "Día de compra":
-                df_predicciones = pd.DataFrame({
-                    'Probabilidad_Martes': pred_proba[:10],
-                    'Día_Predicho': ['MARTES' if p > 0.5 else 'LUNES' for p in pred_proba[:10]]
-                })
-            elif seleccion == "Probabilidad de compra":
-                df_predicciones = pd.DataFrame({
-                    'Probabilidad_Compra': pred_proba[:10],
-                    'Decisión': ['COMPRA' if p > 0.5 else 'NO COMPRA' for p in pred_proba[:10]]
-                })
-            elif seleccion == "Producto comprado":
-                df_predicciones = pd.DataFrame({
-                    'Confianza_Predicción': pred_proba[:10],
-                    'Producto_Predicho': pred[:10]
-                })
-                st.info("Nota: Los productos aparecen codificados (0-9) como durante el entrenamiento")
-            else:
-                df_predicciones = pd.DataFrame({
-                    'Probabilidad': pred_proba[:10],
-                    'Predicción': pred[:10]
-                })
-            
-            st.dataframe(df_predicciones)
+            # ELIMINADA LA SECCIÓN DE PREDICCIONES INDIVIDUALES QUE CAUSABA EL ERROR
 
         except FileNotFoundError:
             st.error(f"No se encontró el archivo: {modelo_path}")
         except Exception as e:
             st.error(f"No se pudo cargar el modelo: {e}")
-            st.write("Detalles del error:", str(e))
