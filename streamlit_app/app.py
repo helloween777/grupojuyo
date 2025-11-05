@@ -134,31 +134,37 @@ elif menu == "Modelos":
             # CARGAR DATOS ESPECÍFICOS PARA CADA MODELO
             if seleccion == "Probabilidad de compra":
                 datos_muestra = datos_completos[features_por_modelo['compro']].head(100)
+                modelo = cargar_modelo(modelo_path)
+                with st.spinner('Calculando predicciones...'):
+                    pred = modelo.predict(datos_muestra)
+                    if hasattr(modelo, 'predict_proba'):
+                        pred_proba = modelo.predict_proba(datos_muestra)[:, 1]
+                    else:
+                        pred_proba = pred
+
             elif seleccion == "Día de compra":
                 datos_muestra = datos_completos[features_por_modelo['dia_compra']].head(100)
-            elif seleccion == "Producto comprado":
-                datos_muestra = datos_completos[features_por_modelo['producto']].head(100)
-            elif seleccion == "Cantidad comprada":
-                datos_muestra = datos_completos[features_por_modelo['cantidad']].head(100)
-            
-            # CARGAR Y USAR MODELO
-            if seleccion == "Producto comprado":
-                try:
-                    # Cargar y VERIFICAR qué hay realmente
-                    modelo_data = cargar_modelo(modelo_path)
-        
-                    # DIAGNÓSTICO: Mostrar qué se cargó
-                    st.write(f"Tipo cargado: {type(modelo_data)}")
-        
-                    if isinstance(modelo_data, dict) and 'model' in modelo_data:
-                        st.success("Estructura correcta - modelo cargado con cat_features")
-                        modelo = modelo_data['model']
-                        cat_features = modelo_data['cat_features']
-                        features_esperadas = modelo_data['features']
-            
-            # Usar las features ESPECÍFICAS del modelo guardado
-            datos_muestra = datos_completos[features_esperadas].head(100)
+                modelo = cargar_modelo(modelo_path)
+                with st.spinner('Calculando predicciones...'):
+                    pred = modelo.predict(datos_muestra)
+                    if hasattr(modelo, 'predict_proba'):
+                        pred_proba = modelo.predict_proba(datos_muestra)[:, 1]
+                    else:
+                        pred_proba = pred
 
+            elif seleccion == "Producto comprado":
+                # Cargar modelo COMPLETO con cat_features
+                modelo_data = cargar_modelo(modelo_path)
+                
+                # Verificar estructura
+                if not isinstance(modelo_data, dict) or 'model' not in modelo_data:
+                    st.error("Error: El modelo no tiene la estructura esperada")
+                    return
+                    
+                modelo = modelo_data['model']
+                cat_features = modelo_data['cat_features']
+                features_esperadas = modelo_data['features']
+                
                 # Usar las features ESPECÍFICAS del modelo guardado
                 datos_muestra = datos_completos[features_esperadas].head(100)
                 
@@ -181,20 +187,10 @@ elif menu == "Modelos":
                     pred_proba = modelo.predict_proba(datos_muestra, cat_features=cat_features)
                     # Para multiclase, usar la probabilidad máxima como score
                     pred_proba = np.max(pred_proba, axis=1)
-                
-            else:
-                st.error("Error: El archivo no tiene la estructura esperada")
-                st.write("Contenido cargado:", modelo_data)
-            return
-            
-        except Exception as e:
-            st.error(f"Error al cargar el modelo: {e}")
-            return
-                    
-            else:
-                # Para otros modelos (carga normal)
+
+            elif seleccion == "Cantidad comprada":
+                datos_muestra = datos_completos[features_por_modelo['cantidad']].head(100)
                 modelo = cargar_modelo(modelo_path)
-                
                 with st.spinner('Calculando predicciones...'):
                     pred = modelo.predict(datos_muestra)
                     if hasattr(modelo, 'predict_proba'):
@@ -413,7 +409,7 @@ elif menu == "Modelos":
             elif seleccion == "Producto comprado":
                 df_predicciones = pd.DataFrame({
                     'Confianza_Predicción': pred_proba[:10],
-                    'Producto_Predicho': pred[:10]  # Los productos ya vienen codificados
+                    'Producto_Predicho': pred[:10]
                 })
                 st.info("Nota: Los productos aparecen codificados (0-9) como durante el entrenamiento")
             else:
