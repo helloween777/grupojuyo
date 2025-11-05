@@ -6,7 +6,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
+import os
 from sklearn.ensemble import RandomForestRegressor
+
 st.write("RandomForestRegressor disponible.")
 
 st.set_page_config(page_title="Grupo Juyo", layout="wide")
@@ -24,7 +26,7 @@ menu = st.sidebar.radio("Menú principal", ["Mapa", "EDA", "Modelos"])
 if menu == "Mapa":
     st.subheader("Distribución geográfica de gaseosas")
     try:
-        df_mapa = pd.read_csv("data/raw/data6_corregido.csv")
+        df_mapa = pd.read_csv("../data/raw/data6_corregido.csv")
         if "coordenadas_envio" in df_mapa.columns:
             coords = df_mapa["coordenadas_envio"].dropna().str.extract(r"\((.*),\s*(.*)\)")
             coords.columns = ["lat", "lon"]
@@ -40,10 +42,10 @@ elif menu == "EDA":
     tipo_eda = st.radio("Tipo de EDA", ["Original", "Limpio", "Corregido", "Con features"])
 
     rutas = {
-        "Original": "data/data6.csv",
-        "Limpio": "data/data6_limpio.csv",
-        "Corregido": "data/raw/data6_corregido.csv",
-        "Con features": "data/features/data6_features.csv"
+        "Original": "../data/data6.csv",
+        "Limpio": "../data/data6_limpio.csv",
+        "Corregido": "../data/raw/data6_corregido.csv",
+        "Con features": "../data/features/data6_features.csv"
     }
 
     ruta = rutas[tipo_eda]
@@ -89,43 +91,88 @@ elif menu == "Modelos":
     st.subheader("Predicción con modelos del Grupo Juyo")
 
     modelos_disponibles = {
-        "Probabilidad de compra": "mejor_modelo_compro.pkl",
-        "Día de compra": "modelo_dia_compra.pkl",
-        "Producto comprado": "modelo_producto.pkl",
-        "Cantidad comprada": "modelo_cantidad.pkl"
+        "Probabilidad de compra": "../models/mejor_modelo_compro.pkl",
+        "Día de compra": "../models/modelo_dia_compra.pkl",
+        "Producto comprado": "../models/modelo_producto.pkl",
+        "Cantidad comprada": "../models/modelo_cantidad.pkl"
     }
 
     seleccion = st.selectbox("Selecciona un modelo", list(modelos_disponibles.keys()))
-    modelo_path = f"models/{modelos_disponibles[seleccion]}"
+    modelo_path = modelos_disponibles[seleccion]
+
+    # Debug: verificar estructura de archivos
+    st.sidebar.subheader("Debug - Estructura de archivos")
+    try:
+        if os.path.exists(".."):
+            st.sidebar.write("Directorios en raiz:")
+            directorios = [d for d in os.listdir("..") if os.path.isdir(os.path.join("..", d))]
+            st.sidebar.write(directorios)
+            
+            if os.path.exists("../models"):
+                st.sidebar.write("Archivos en models:")
+                archivos_models = os.listdir("../models")
+                st.sidebar.write(archivos_models)
+            else:
+                st.sidebar.write("Directorio models no encontrado")
+    except Exception as e:
+        st.sidebar.write(f"Error en debug: {e}")
 
     try:
-        with open(modelo_path, "rb") as f:
-            modelo = pickle.load(f)
-
-        if not hasattr(modelo, "predict"):
-            st.error(f"El archivo '{modelo_path}' no contiene un modelo válido. Tipo: {type(modelo)}")
+        # Verificar si el archivo existe
+        if not os.path.exists(modelo_path):
+            st.error(f"Archivo no encontrado: {modelo_path}")
+            st.info("Por favor verifica la estructura de directorios:")
+            st.code("""
+            proyecto/
+            ├── models/
+            │   ├── mejor_modelo_compro.pkl
+            │   ├── modelo_cantidad.pkl
+            │   ├── modelo_dia_compra.pkl
+            │   └── modelo_producto.pkl
+            ├── data/
+            │   ├── data6.csv
+            │   ├── data6_limpio.csv
+            │   ├── raw/data6_corregido.csv
+            │   └── features/data6_features.csv
+            └── streamlit_app/
+                ├── app.py
+                └── assets/portada_juyo.png
+            """)
         else:
-            df = pd.read_csv("data/features/data6_features.csv")
+            st.success(f"Archivo encontrado: {modelo_path}")
+            
+            with open(modelo_path, "rb") as f:
+                modelo = pickle.load(f)
 
-            st.write("Datos de entrada:")
-            st.dataframe(df.head())
+            st.write(f"Tipo de modelo cargado: {type(modelo)}")
 
-            pred = modelo.predict(df)
+            if not hasattr(modelo, "predict"):
+                st.error(f"El archivo '{modelo_path}' no contiene un modelo válido. Tipo: {type(modelo)}")
+            else:
+                df = pd.read_csv("../data/features/data6_features.csv")
 
-            st.write(f"Predicciones para: {seleccion}")
-            st.write(pred)
+                st.write("Datos de entrada:")
+                st.dataframe(df.head())
 
-            if seleccion == "Cantidad comprada":
-                st.bar_chart(pred)
-            elif seleccion == "Día de compra":
-                st.bar_chart(pd.Series(pred).value_counts().sort_index())
-            elif seleccion == "Producto comprado":
-                st.write("Distribución de productos:")
-                st.bar_chart(pd.Series(pred).value_counts())
-            elif seleccion == "Probabilidad de compra":
-                st.line_chart(pred)
+                pred = modelo.predict(df)
+
+                st.write(f"Predicciones para: {seleccion}")
+                st.write(pred)
+
+                if seleccion == "Cantidad comprada":
+                    st.bar_chart(pred)
+                elif seleccion == "Día de compra":
+                    st.bar_chart(pd.Series(pred).value_counts().sort_index())
+                elif seleccion == "Producto comprado":
+                    st.write("Distribución de productos:")
+                    st.bar_chart(pd.Series(pred).value_counts())
+                elif seleccion == "Probabilidad de compra":
+                    st.line_chart(pred)
 
     except FileNotFoundError:
         st.error(f"No se encontró el archivo: {modelo_path}")
     except Exception as e:
         st.error(f"No se pudo cargar el modelo: {e}")
+        import traceback
+        st.write("Detalles del error:")
+        st.code(traceback.format_exc())
