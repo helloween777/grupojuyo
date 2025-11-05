@@ -90,10 +90,10 @@ elif menu == "Modelos":
     st.subheader("Predicción con modelos del Grupo Juyo")
 
     modelos_disponibles = {
-        "Probabilidad de compra": "mejor_modelo_compro.pkl",
-        "Día de compra": "modelo_dia_compra.pkl",
-        "Producto comprado": "modelo_producto.pkl",
-        "Cantidad comprada": "modelo_cantidad.pkl"
+        "Probabilidad de compra": "../models/mejor_modelo_compro.pkl",
+        "Día de compra": "../models/modelo_dia_compra.pkl",
+        "Producto comprado": "../models/modelo_producto.pkl",
+        "Cantidad comprada": "../models/modelo_cantidad.pkl"
     }
 
     seleccion = st.selectbox("Selecciona un modelo", list(modelos_disponibles.keys()))
@@ -106,7 +106,7 @@ elif menu == "Modelos":
         if not hasattr(modelo, "predict"):
             st.error(f"El archivo '{modelo_path}' no contiene un modelo válido. Tipo: {type(modelo)}")
         else:
-            df = pd.read_csv("data/features/data6_features.csv")
+            df = pd.read_csv("../data/features/data6_features.csv")
 
             st.write("Datos de entrada:")
             st.dataframe(df.head())
@@ -130,6 +130,3 @@ elif menu == "Modelos":
         st.error(f"No se encontró el archivo: {modelo_path}")
     except Exception as e:
         st.error(f"No se pudo cargar el modelo: {e}")
-        import traceback
-        st.write("Detalles del error:")
-        st.code(traceback.format_exc())
