@@ -159,7 +159,8 @@ elif menu == "Modelos":
                 # Verificar estructura
                 if not isinstance(modelo_data, dict) or 'model' not in modelo_data:
                     st.error("Error: El modelo no tiene la estructura esperada")
-                    return
+                    # En lugar de return, usar st.stop()
+                    st.stop()
                     
                 modelo = modelo_data['model']
                 cat_features = modelo_data['cat_features']
