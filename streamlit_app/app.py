@@ -90,10 +90,10 @@ elif menu == "Modelos":
     st.subheader("Predicción con modelos del Grupo Juyo")
 
     modelos_disponibles = {
-        "Probabilidad de compra": "../models/mejor_modelo_compro.pkl",
-        "Día de compra": "../models/modelo_dia_compra.pkl",
-        "Producto comprado": "../models/modelo_producto.pkl",
-        "Cantidad comprada": "../models/modelo_cantidad.pkl"
+        "Probabilidad de compra": "models/mejor_modelo_compro.pkl",
+        "Día de compra": "models/modelo_dia_compra.pkl",
+        "Producto comprado": "models/modelo_producto.pkl",
+        "Cantidad comprada": "models/modelo_cantidad.pkl"
     }
 
     seleccion = st.selectbox("Selecciona un modelo", list(modelos_disponibles.keys()))
