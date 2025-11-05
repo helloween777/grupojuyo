@@ -156,38 +156,65 @@ elif menu == "Modelos":
                 # Cargar modelo COMPLETO con cat_features
                 modelo_data = cargar_modelo(modelo_path)
                 
-                # Verificar estructura
-                if not isinstance(modelo_data, dict) or 'model' not in modelo_data:
-                    st.error("Error: El modelo no tiene la estructura esperada")
-                    st.stop()
-                    
-                modelo = modelo_data['model']
-                cat_features = modelo_data['cat_features']
-                features_esperadas = modelo_data['features']
+                # DEBUG: Ver qué contiene realmente el modelo
+                st.write("DEBUG - Información del modelo cargado:")
+                st.write(f"Tipo del objeto: {type(modelo_data)}")
+                st.write(f"Es diccionario: {isinstance(modelo_data, dict)}")
                 
-                st.write(f"✅ Características esperadas: {features_esperadas}")
-                st.write(f"✅ Características categóricas (índices): {cat_features}")
+                if isinstance(modelo_data, dict):
+                    st.write("Claves del diccionario:", list(modelo_data.keys()))
+                    # Si es diccionario, usar la estructura esperada
+                    if 'model' not in modelo_data:
+                        st.error("Error: El diccionario no contiene la clave 'model'")
+                        st.stop()
+                    
+                    modelo = modelo_data['model']
+                    cat_features = modelo_data.get('cat_features', [])
+                    features_esperadas = modelo_data.get('features', features_por_modelo['producto'])
+                    
+                else:
+                    # Si es directamente el modelo, crear estructura esperada
+                    st.write("El modelo es directamente el modelo entrenado (no diccionario)")
+                    modelo = modelo_data
+                    cat_features = [0, 2, 3, 4, 5, 8]  # Índices basados en features_producto
+                    features_esperadas = features_por_modelo['producto']
+                
+                st.write(f"Características esperadas: {features_esperadas}")
+                st.write(f"Características categóricas (indices): {cat_features}")
                 
                 # Usar las features ESPECÍFICAS del modelo guardado
                 datos_muestra = datos_completos[features_esperadas].head(100).copy()
                 
-                # ✅ CORRECCIÓN CRÍTICA: Las cat_features deben ser categóricas
+                # CORRECCION CRITICA: Las cat_features deben ser categoricas
                 for i, col in enumerate(features_esperadas):
                     if i in cat_features:
-                        # Mantener como categoría (CatBoost las espera así)
+                        # Mantener como categoria (CatBoost las espera asi)
                         datos_muestra[col] = datos_muestra[col].astype('category')
-                        st.write(f"🔹 {col} → tipo: category")
+                        st.write(f"{col} -> tipo: category")
                     else:
-                        # Las numéricas sí pueden ser float
+                        # Las numericas si pueden ser float
                         datos_muestra[col] = datos_muestra[col].astype('float32')
-                        st.write(f"🔸 {col} → tipo: float32")
+                        st.write(f"{col} -> tipo: float32")
                 
                 # Predecir CON cat_features
                 with st.spinner('Calculando predicciones de producto...'):
-                    pred = modelo.predict(datos_muestra, cat_features=cat_features)
-                    pred_proba = modelo.predict_proba(datos_muestra, cat_features=cat_features)
-                    # Para multiclase, usar la probabilidad máxima como score
-                    pred_proba = np.max(pred_proba, axis=1)
+                    if cat_features and hasattr(modelo, 'predict'):
+                        # Si tiene cat_features y es CatBoost
+                        pred = modelo.predict(datos_muestra, cat_features=cat_features)
+                        pred_proba = modelo.predict_proba(datos_muestra, cat_features=cat_features)
+                    else:
+                        # Si no tiene cat_features o es otro tipo de modelo
+                        pred = modelo.predict(datos_muestra)
+                        if hasattr(modelo, 'predict_proba'):
+                            pred_proba = modelo.predict_proba(datos_muestra)
+                        else:
+                            pred_proba = pred
+                    
+                    # Para multiclase, usar la probabilidad maxima como score
+                    if len(pred_proba.shape) > 1:
+                        pred_proba = np.max(pred_proba, axis=1)
+                    else:
+                        pred_proba = pred_proba
 
             elif seleccion == "Cantidad comprada":
                 datos_muestra = datos_completos[features_por_modelo['cantidad']].head(100)
@@ -199,50 +226,50 @@ elif menu == "Modelos":
                     else:
                         pred_proba = pred
 
-            st.success("✅ Predicciones completadas")
+            st.success("Predicciones completadas")
             
             # Mostrar datos de entrada
             st.write("### Datos de Entrada (primeras 10 filas)")
             st.dataframe(datos_muestra.head(10))
 
-            # Mostrar estadísticas básicas
-            st.write("### Estadísticas de Predicciones")
+            # Mostrar estadisticas basicas
+            st.write("### Estadisticas de Predicciones")
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                st.metric("Mínimo", f"{pred_proba.min():.3f}")
+                st.metric("Minimo", f"{pred_proba.min():.3f}")
             with col2:
-                st.metric("Máximo", f"{pred_proba.max():.3f}")
+                st.metric("Maximo", f"{pred_proba.max():.3f}")
             with col3:
                 st.metric("Promedio", f"{pred_proba.mean():.3f}")
             with col4:
-                st.metric("Desviación", f"{pred_proba.std():.3f}")
+                st.metric("Desviacion", f"{pred_proba.std():.3f}")
 
-            # DISTRIBUCIÓN DE LAS PREDICCIONES
-            st.write("### Distribución de Probabilidades")
+            # DISTRIBUCION DE LAS PREDICCIONES
+            st.write("### Distribucion de Probabilidades")
             fig, ax = plt.subplots(figsize=(10, 6))
             ax.hist(pred_proba, bins=20, alpha=0.7, color='blue', edgecolor='black')
             
-            if seleccion == "Día de compra":
+            if seleccion == "Dia de compra":
                 ax.set_xlabel('Probabilidad de Compra el Martes')
-                ax.set_title('Distribución de Probabilidades de Compra el Martes')
+                ax.set_title('Distribucion de Probabilidades de Compra el Martes')
             elif seleccion == "Probabilidad de compra":
                 ax.set_xlabel('Probabilidad de Compra')
-                ax.set_title('Distribución de Probabilidades de Compra')
+                ax.set_title('Distribucion de Probabilidades de Compra')
             elif seleccion == "Producto comprado":
                 ax.set_xlabel('Confianza del Producto Predicho')
-                ax.set_title('Distribución de Confianza en Predicciones de Producto')
+                ax.set_title('Distribucion de Confianza en Predicciones de Producto')
             else:
                 ax.set_xlabel('Probabilidad')
-                ax.set_title('Distribución de las Predicciones')
+                ax.set_title('Distribucion de las Predicciones')
                 
             ax.set_ylabel('Frecuencia')
             ax.grid(True, alpha=0.3)
             st.pyplot(fig)
 
-            # ANÁLISIS DE UMBRALES
-            st.write("### Análisis de Umbrales de Decisión")
+            # ANALISIS DE UMBRALES
+            st.write("### Analisis de Umbrales de Decision")
             
-            if seleccion == "Día de compra":
+            if seleccion == "Dia de compra":
                 umbrales = [0.3, 0.5, 0.7]
                 resultados_umbral = []
                 for umbral in umbrales:
@@ -272,17 +299,17 @@ elif menu == "Modelos":
                     porcentaje = (compras_predichas / len(pred_proba)) * 100
                     resultados_umbral.append({
                         'Umbral': umbral,
-                        'Clientes que Comprarían': compras_predichas,
+                        'Clientes que Comprarian': compras_predichas,
                         'Porcentaje': f'{porcentaje:.1f}%'
                     })
 
             df_umbrales = pd.DataFrame(resultados_umbral)
             st.dataframe(df_umbrales)
 
-            # SEGMENTACIÓN DE CLIENTES
-            st.write("### Segmentación de Clientes")
+            # SEGMENTACION DE CLIENTES
+            st.write("### Segmentacion de Clientes")
             
-            if seleccion == "Día de compra":
+            if seleccion == "Dia de compra":
                 segmentos = [
                     (0.0, 0.2, 'Muy Probable Lunes'),
                     (0.2, 0.4, 'Probable Lunes'), 
@@ -319,12 +346,12 @@ elif menu == "Modelos":
             df_segmentos = pd.DataFrame(datos_segmentos)
             st.dataframe(df_segmentos)
 
-            # GRÁFICO DE SEGMENTOS
+            # GRAFICO DE SEGMENTOS
             fig2, ax2 = plt.subplots(figsize=(10, 6))
             ax2.bar(df_segmentos['Segmento'], df_segmentos['Clientes'], 
                    color=['#ff6b6b', '#ffd166', '#06d6a0', '#118ab2', '#073b4c'][:len(segmentos)])
-            ax2.set_ylabel('Número de Clientes')
-            ax2.set_title('Distribución de Clientes por Segmento')
+            ax2.set_ylabel('Numero de Clientes')
+            ax2.set_title('Distribucion de Clientes por Segmento')
             ax2.tick_params(axis='x', rotation=45)
             
             for i, v in enumerate(df_segmentos['Clientes']):
@@ -333,25 +360,25 @@ elif menu == "Modelos":
             plt.tight_layout()
             st.pyplot(fig2)
 
-            # IMPORTANCIA DE CARACTERÍSTICAS (si está disponible)
+            # IMPORTANCIA DE CARACTERISTICAS (si esta disponible)
             if hasattr(modelo, 'feature_importances_'):
-                st.write("### Importancia de Características")
+                st.write("### Importancia de Caracteristicas")
                 
                 importancia = modelo.feature_importances_
                 caracteristicas = datos_muestra.columns
                 
                 df_importancia = pd.DataFrame({
-                    'Característica': caracteristicas,
+                    'Caracteristica': caracteristicas,
                     'Importancia': importancia
                 }).sort_values('Importancia', ascending=False)
                 
                 st.dataframe(df_importancia)
                 
-                # Gráfico de importancia
+                # Grafico de importancia
                 fig3, ax3 = plt.subplots(figsize=(10, 6))
-                ax3.barh(df_importancia['Característica'], df_importancia['Importancia'])
+                ax3.barh(df_importancia['Caracteristica'], df_importancia['Importancia'])
                 ax3.set_xlabel('Importancia')
-                ax3.set_title('Importancia de Características en el Modelo')
+                ax3.set_title('Importancia de Caracteristicas en el Modelo')
                 plt.tight_layout()
                 st.pyplot(fig3)
 
@@ -360,12 +387,12 @@ elif menu == "Modelos":
             col1, col2 = st.columns(2)
             
             with col1:
-                st.write("**Métricas Clave:**")
+                st.write("**Metricas Clave:**")
                 st.write(f"- Total clientes analizados: {len(pred_proba)}")
                 
-                if seleccion == "Día de compra":
+                if seleccion == "Dia de compra":
                     martes_predichos = (pred_proba > 0.5).sum()
-                    st.write(f"- Clientes que comprarán Martes: {martes_predichos} ({martes_predichos/len(pred_proba)*100:.1f}%)")
+                    st.write(f"- Clientes que compraran Martes: {martes_predichos} ({martes_predichos/len(pred_proba)*100:.1f}%)")
                     st.write(f"- Probabilidad promedio Martes: {pred_proba.mean():.1%}")
                 elif seleccion == "Probabilidad de compra":
                     alta_prob = (pred_proba > 0.7).sum()
@@ -380,11 +407,11 @@ elif menu == "Modelos":
                     st.write(f"- Probabilidad promedio: {pred_proba.mean():.1%}")
                 
             with col2:
-                st.write("**Evaluación del Modelo:**")
+                st.write("**Evaluacion del Modelo:**")
                 st.write(f"- Variabilidad: {'Alta' if pred_proba.std() > 0.1 else 'Moderada' if pred_proba.std() > 0.05 else 'Baja'}")
                 st.write(f"- Rango de predicciones: {pred_proba.max() - pred_proba.min():.3f}")
                 
-                if seleccion == "Día de compra":
+                if seleccion == "Dia de compra":
                     muy_martes = (pred_proba > 0.8).sum()
                     st.write(f"- Clientes muy seguros de Martes (>80%): {muy_martes}")
                 elif seleccion == "Producto comprado":
@@ -397,32 +424,32 @@ elif menu == "Modelos":
             # PREDICCIONES INDIVIDUALES
             st.write("### Predicciones Individuales (primeras 10)")
             
-            if seleccion == "Día de compra":
+            if seleccion == "Dia de compra":
                 df_predicciones = pd.DataFrame({
                     'Probabilidad_Martes': pred_proba[:10],
-                    'Día_Predicho': ['MARTES' if p > 0.5 else 'LUNES' for p in pred_proba[:10]]
+                    'Dia_Predicho': ['MARTES' if p > 0.5 else 'LUNES' for p in pred_proba[:10]]
                 })
             elif seleccion == "Probabilidad de compra":
                 df_predicciones = pd.DataFrame({
                     'Probabilidad_Compra': pred_proba[:10],
-                    'Decisión': ['COMPRA' if p > 0.5 else 'NO COMPRA' for p in pred_proba[:10]]
+                    'Decision': ['COMPRA' if p > 0.5 else 'NO COMPRA' for p in pred_proba[:10]]
                 })
             elif seleccion == "Producto comprado":
                 df_predicciones = pd.DataFrame({
-                    'Confianza_Predicción': pred_proba[:10],
+                    'Confianza_Prediccion': pred_proba[:10],
                     'Producto_Predicho': pred[:10]
                 })
                 st.info("Nota: Los productos aparecen codificados (0-9) como durante el entrenamiento")
             else:
                 df_predicciones = pd.DataFrame({
                     'Probabilidad': pred_proba[:10],
-                    'Predicción': pred[:10]
+                    'Prediccion': pred[:10]
                 })
             
             st.dataframe(df_predicciones)
 
         except FileNotFoundError:
-            st.error(f" No se encontró el archivo: {modelo_path}")
+            st.error(f"No se encontro el archivo: {modelo_path}")
         except Exception as e:
-            st.error(f" No se pudo cargar el modelo: {e}")
+            st.error(f"No se pudo cargar el modelo: {e}")
             st.write("Detalles del error:", str(e))
