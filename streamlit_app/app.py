@@ -160,62 +160,36 @@ elif menu == "Modelos":
                 # Usar las features específicas para producto
                 features_esperadas = features_por_modelo['producto']
                 datos_muestra = datos_completos[features_esperadas].head(100).copy()
-
-                # CORRECCIÓN CRÍTICA: Asegurar que todas las columnas sean 1-dimensional
+                
+                # Solución simple: recrear el DataFrame para asegurar 1D
+                datos_muestra_clean = pd.DataFrame()
                 for col in datos_muestra.columns:
-                    # Si la columna es un array multidimensional, convertir a 1D
-                    if hasattr(datos_muestra[col], 'ndim') and datos_muestra[col].ndim > 1:
-                        datos_muestra[col] = datos_muestra[col].iloc[:, 0]
-                    # Si es una Series con arrays, aplanar
-                    elif datos_muestra[col].apply(lambda x: isinstance(x, (list, np.ndarray))).any():
-                        datos_muestra[col] = datos_muestra[col].apply(
-                            lambda x: x[0] if isinstance(x, (list, np.ndarray)) and len(x) > 0 else x
-                        )
-                # Asegurar que las características categóricas sean del tipo correcto
+                    datos_muestra_clean[col] = datos_muestra[col].values
+                
+                datos_muestra = datos_muestra_clean
+                
+                # Procesar tipos de datos
                 categorical_cols = ['tipo_cliente', 'producto_favorito_cliente', 
                                   'metodo_pago_habitual', 'segmento_comportamiento', 'estacion']
                 
                 for col in categorical_cols:
                     if col in datos_muestra.columns:
-                        # Convertir a string primero para evitar problemas
-                        datos_muestra[col] = datos_muestra[col].astype(str)
-                        # Luego a categoría
                         datos_muestra[col] = datos_muestra[col].astype('category')
                 
-                # Las numéricas mantener como float
                 numeric_cols = ['frecuencia_mensual', 'valor_promedio_cliente', 
                               'antiguedad_meses', 'dia_semana_num']
                 for col in numeric_cols:
                     if col in datos_muestra.columns:
-                        datos_muestra[col] = pd.to_numeric(datos_muestra[col], errors='coerce').astype('float32')
-
-                 # Verificar que no hay valores NaN después de la conversión
-                 datos_muestra = datos_muestra.fillna(0)
-    
-                 # Predecir SIN cat_features (el modelo ya las conoce)
-                 with st.spinner('Calculando predicciones de producto...'):
-                     pred = modelo.predict(datos_muestra)
-                     if hasattr(modelo, 'predict_proba'):
-                         pred_proba = modelo.predict_proba(datos_muestra)
-                         # Para multiclase, usar la probabilidad máxima como score
-                         pred_proba = np.max(pred_proba, axis=1)
-                     else:
-                         pred_proba = pred
+                        datos_muestra[col] = datos_muestra[col].astype('float32')
                 
-                 # Asegurar que no hay arrays multidimensionales
-                 for col in datos_muestra.columns:
-                     if hasattr(datos_muestra[col], 'ndim') and datos_muestra[col].ndim > 1:
-                         datos_muestra[col] = datos_muestra[col].iloc[:, 0]
-                
-                 # Predecir SIN cat_features (el modelo ya las conoce)
-                 with st.spinner('Calculando predicciones de producto...'):
-                     pred = modelo.predict(datos_muestra)
-                     if hasattr(modelo, 'predict_proba'):
-                         pred_proba = modelo.predict_proba(datos_muestra)
-                         # Para multiclase, usar la probabilidad máxima como score
-                         pred_proba = np.max(pred_proba, axis=1)
-                     else:
-                         pred_proba = pred
+                # Predecir
+                with st.spinner('Calculando predicciones de producto...'):
+                    pred = modelo.predict(datos_muestra)
+                    if hasattr(modelo, 'predict_proba'):
+                        pred_proba = modelo.predict_proba(datos_muestra)
+                        pred_proba = np.max(pred_proba, axis=1)
+                    else:
+                        pred_proba = pred
 
             elif seleccion == "Cantidad comprada":
                 datos_muestra = datos_completos[features_por_modelo['cantidad']].head(100)
