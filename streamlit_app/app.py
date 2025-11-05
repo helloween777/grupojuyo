@@ -85,10 +85,24 @@ elif menu == "EDA":
     except Exception as e:
         st.error(f"No se pudo cargar el archivo: {e}")
 
-# Sección: Modelos
+# Sección: Modelos 
 elif menu == "Modelos":
     st.subheader("Predicción con modelos del Grupo Juyo")
-
+    
+    # Cargar datos UNA sola vez y cachearlos
+    @st.cache_data
+    def cargar_datos():
+        df = pd.read_csv("data/features/data6_features.csv")
+        features_esperadas = ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
+                            'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago']
+        return df[features_esperadas] if all(f in df.columns for f in features_esperadas) else None
+    
+    datos = cargar_datos()
+    
+    if datos is None:
+        st.error("No se encontraron las features necesarias en el CSV")
+        st.stop()
+    
     modelos_disponibles = {
         "Probabilidad de compra": "models/mejor_modelo_compro.pkl",
         "Día de compra": "models/modelo_dia_compra.pkl",
@@ -97,49 +111,41 @@ elif menu == "Modelos":
     }
 
     seleccion = st.selectbox("Selecciona un modelo", list(modelos_disponibles.keys()))
-    modelo_path = modelos_disponibles[seleccion]
+    
+    if st.button("Ejecutar Predicción"):
+        modelo_path = modelos_disponibles[seleccion]
 
-    try:
-        with open(modelo_path, "rb") as f:
-            modelo = pickle.load(f)
+        try:
+            with open(modelo_path, "rb") as f:
+                modelo = pickle.load(f)
 
-        if not hasattr(modelo, "predict"):
-            st.error(f"El archivo '{modelo_path}' no contiene un modelo válido. Tipo: {type(modelo)}")
-        else:
-            df = pd.read_csv("data/features/data6_features.csv")
-            
-            # SOLO usar las features que el modelo espera
-            features_esperadas = ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
-                                'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago']
-            
-            # Verificar que existen las features
-            features_disponibles = [f for f in features_esperadas if f in df.columns]
-            
-            if len(features_disponibles) != len(features_esperadas):
-                st.error(f"Faltan features. Esperadas: {features_esperadas}")
-                st.error(f"Disponibles: {list(df.columns)}")
+            if not hasattr(modelo, "predict"):
+                st.error(f"El archivo no contiene un modelo válido. Tipo: {type(modelo)}")
             else:
-                X_pred = df[features_esperadas]
+                # Usar solo las primeras 100 filas para prueba
+                datos_muestra = datos.head(100)
                 
-                st.write("Datos de entrada (solo features usadas por el modelo):")
-                st.dataframe(X_pred.head())
+                st.write("Datos de entrada (primeras 100 filas):")
+                st.dataframe(datos_muestra.head(10))
 
-                pred = modelo.predict(X_pred)
+                pred = modelo.predict(datos_muestra)
+                pred_proba = modelo.predict_proba(datos_muestra)[:, 1] if hasattr(modelo, 'predict_proba') else pred
 
                 st.write(f"Predicciones para: {seleccion}")
-                st.write(pred)
+                st.write(f"Rango de predicciones: {pred_proba.min():.3f} - {pred_proba.max():.3f}")
+                
+                # Mostrar estadísticas de las predicciones
+                st.write("Estadísticas de predicciones:")
+                st.write(f"- Mínimo: {pred_proba.min():.3f}")
+                st.write(f"- Máximo: {pred_proba.max():.3f}")
+                st.write(f"- Promedio: {pred_proba.mean():.3f}")
+                st.write(f"- Desviación: {pred_proba.std():.3f}")
 
-                if seleccion == "Cantidad comprada":
-                    st.bar_chart(pred)
-                elif seleccion == "Día de compra":
-                    st.bar_chart(pd.Series(pred).value_counts().sort_index())
-                elif seleccion == "Producto comprado":
-                    st.write("Distribución de productos:")
-                    st.bar_chart(pd.Series(pred).value_counts())
-                elif seleccion == "Probabilidad de compra":
-                    st.line_chart(pred)
+                if seleccion == "Probabilidad de compra":
+                    st.line_chart(pred_proba)
+                    # Si todas las predicciones son iguales, mostrar advertencia
+                    if pred_proba.std() < 0.01:
+                        st.warning("⚠️ Todas las predicciones son muy similares. El modelo podría no estar funcionando correctamente.")
 
-    except FileNotFoundError:
-        st.error(f"No se encontró el archivo: {modelo_path}")
-    except Exception as e:
-        st.error(f"No se pudo cargar el modelo: {e}")
+        except Exception as e:
+            st.error(f"No se pudo cargar el modelo: {e}")
