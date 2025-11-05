@@ -192,30 +192,30 @@ elif menu == "Modelos":
                  # Verificar que no hay valores NaN después de la conversión
                  datos_muestra = datos_muestra.fillna(0)
     
-                # Predecir SIN cat_features (el modelo ya las conoce)
-                with st.spinner('Calculando predicciones de producto...'):
-                    pred = modelo.predict(datos_muestra)
-                    if hasattr(modelo, 'predict_proba'):
-                        pred_proba = modelo.predict_proba(datos_muestra)
-                        # Para multiclase, usar la probabilidad máxima como score
-                        pred_proba = np.max(pred_proba, axis=1)
-                    else:
-                        pred_proba = pred
+                 # Predecir SIN cat_features (el modelo ya las conoce)
+                 with st.spinner('Calculando predicciones de producto...'):
+                     pred = modelo.predict(datos_muestra)
+                     if hasattr(modelo, 'predict_proba'):
+                         pred_proba = modelo.predict_proba(datos_muestra)
+                         # Para multiclase, usar la probabilidad máxima como score
+                         pred_proba = np.max(pred_proba, axis=1)
+                     else:
+                         pred_proba = pred
                 
-                # Asegurar que no hay arrays multidimensionales
-                for col in datos_muestra.columns:
-                    if hasattr(datos_muestra[col], 'ndim') and datos_muestra[col].ndim > 1:
-                        datos_muestra[col] = datos_muestra[col].iloc[:, 0]
+                 # Asegurar que no hay arrays multidimensionales
+                 for col in datos_muestra.columns:
+                     if hasattr(datos_muestra[col], 'ndim') and datos_muestra[col].ndim > 1:
+                         datos_muestra[col] = datos_muestra[col].iloc[:, 0]
                 
-                # Predecir SIN cat_features (el modelo ya las conoce)
-                with st.spinner('Calculando predicciones de producto...'):
-                    pred = modelo.predict(datos_muestra)
-                    if hasattr(modelo, 'predict_proba'):
-                        pred_proba = modelo.predict_proba(datos_muestra)
-                        # Para multiclase, usar la probabilidad máxima como score
-                        pred_proba = np.max(pred_proba, axis=1)
-                    else:
-                        pred_proba = pred
+                 # Predecir SIN cat_features (el modelo ya las conoce)
+                 with st.spinner('Calculando predicciones de producto...'):
+                     pred = modelo.predict(datos_muestra)
+                     if hasattr(modelo, 'predict_proba'):
+                         pred_proba = modelo.predict_proba(datos_muestra)
+                         # Para multiclase, usar la probabilidad máxima como score
+                         pred_proba = np.max(pred_proba, axis=1)
+                     else:
+                         pred_proba = pred
 
             elif seleccion == "Cantidad comprada":
                 datos_muestra = datos_completos[features_por_modelo['cantidad']].head(100)
