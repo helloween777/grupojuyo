@@ -90,30 +90,32 @@ elif menu == "Modelos":
     st.subheader("Predicción con modelos del Grupo Juyo")
 
     modelos_disponibles = {
-        "Probabilidad de compra": "models/mejor_modelo_compro.pkl",
-        "Día de compra": "models/modelo_dia_compra.pkl",
-        "Producto comprado": "models/modelo_producto.pkl",
-        "Cantidad comprada": "models/modelo_cantidad.pkl"
+        "Probabilidad de compra": "mejor_modelo_compro.pkl",
+        "Día de compra": "modelo_dia_compra.pkl",
+        "Producto comprado": "modelo_producto.pkl",
+        "Cantidad comprada": "modelo_cantidad.pkl"
     }
 
     seleccion = st.selectbox("Selecciona un modelo", list(modelos_disponibles.keys()))
-    modelo_path = modelos_disponibles[seleccion]
+    modelo_path = f"models/{modelos_disponibles[seleccion]}"
 
     try:
         with open(modelo_path, "rb") as f:
-            contenido = pickle.load(f)
+            modelo = pickle.load(f)
 
-        st.write(f"Tipo de contenido cargado: {type(contenido)}")
-        st.write(f"Forma del contenido: {getattr(contenido, 'shape', 'No tiene forma')}")
+        if not hasattr(modelo, "predict"):
+            st.error(f"El archivo '{modelo_path}' no contiene un modelo válido. Tipo: {type(modelo)}")
+        else:
+            df = pd.read_csv("data/features/data6_features.csv")
 
-        # Si es un array de numpy, son predicciones ya hechas
-        if hasattr(contenido, 'shape'):
-            st.write("Se cargaron predicciones pre-calculadas")
-            pred = contenido
-            
+            st.write("Datos de entrada:")
+            st.dataframe(df.head())
+
+            pred = modelo.predict(df)
+
             st.write(f"Predicciones para: {seleccion}")
             st.write(pred)
-            
+
             if seleccion == "Cantidad comprada":
                 st.bar_chart(pred)
             elif seleccion == "Día de compra":
@@ -123,11 +125,8 @@ elif menu == "Modelos":
                 st.bar_chart(pd.Series(pred).value_counts())
             elif seleccion == "Probabilidad de compra":
                 st.line_chart(pred)
-                
-        else:
-            st.error(f"El archivo no contiene un formato reconocido. Tipo: {type(contenido)}")
 
     except FileNotFoundError:
         st.error(f"No se encontró el archivo: {modelo_path}")
     except Exception as e:
-        st.error(f"No se pudo cargar el archivo: {e}")
+        st.error(f"No se pudo cargar el modelo: {e}")
