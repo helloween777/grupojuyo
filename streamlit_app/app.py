@@ -143,12 +143,21 @@ elif menu == "Modelos":
             
             # CARGAR Y USAR MODELO
             if seleccion == "Producto comprado":
-                # Cargar el DICCIONARIO completo del modelo
-                modelo_data = cargar_modelo(modelo_path)
-                # Extraer el modelo y cat_features del diccionario
-                modelo = modelo_data['model']
-                cat_features = modelo_data['cat_features']
-                features_esperadas = modelo_data['features']
+                try:
+                    # Cargar y VERIFICAR qué hay realmente
+                    modelo_data = cargar_modelo(modelo_path)
+        
+                    # DIAGNÓSTICO: Mostrar qué se cargó
+                    st.write(f"Tipo cargado: {type(modelo_data)}")
+        
+                    if isinstance(modelo_data, dict) and 'model' in modelo_data:
+                        st.success("Estructura correcta - modelo cargado con cat_features")
+                        modelo = modelo_data['model']
+                        cat_features = modelo_data['cat_features']
+                        features_esperadas = modelo_data['features']
+            
+            # Usar las features ESPECÍFICAS del modelo guardado
+            datos_muestra = datos_completos[features_esperadas].head(100)
 
                 # Usar las features ESPECÍFICAS del modelo guardado
                 datos_muestra = datos_completos[features_esperadas].head(100)
