@@ -23,18 +23,154 @@ menu = st.sidebar.radio("Menú principal", ["Mapa", "EDA", "Modelos"])
 
 # Sección: Mapa
 if menu == "Mapa":
-    st.subheader("Distribución geográfica de gaseosas")
+    st.subheader("Distribución geográfica de ventas de gaseosas")
+    
     try:
         df_mapa = pd.read_csv("data/raw/data6_corregido.csv")
+        
         if "coordenadas_envio" in df_mapa.columns:
+            # Extraer coordenadas
             coords = df_mapa["coordenadas_envio"].dropna().str.extract(r"\((.*),\s*(.*)\)")
             coords.columns = ["lat", "lon"]
             coords = coords.astype(float)
-            st.map(coords)
+            
+            # Filtrar coordenadas válidas
+            coords = coords.dropna()
+            coords = coords[(coords['lat'] >= -90) & (coords['lat'] <= 90) & 
+                           (coords['lon'] >= -180) & (coords['lon'] <= 180)]
+            
+            if len(coords) > 0:
+                # Mostrar estadísticas de ubicaciones
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total de ubicaciones", len(coords))
+                with col2:
+                    st.metric("Ubicaciones únicas", len(coords.drop_duplicates()))
+                with col3:
+                    st.metric("Cobertura geográfica", f"{len(coords)/len(df_mapa)*100:.1f}%")
+                
+                # Selector de tipo de mapa
+                tipo_mapa = st.radio(
+                    "Tipo de visualización:",
+                    ["Mapa de calor", "Puntos de distribución", "Análisis por densidad"],
+                    horizontal=True
+                )
+                
+                if tipo_mapa == "Mapa de calor":
+                    # Mapa de calor
+                    st.map(coords, use_container_width=True)
+                    
+                elif tipo_mapa == "Puntos de distribución":
+                    # Puntos individuales con información adicional
+                    if "cantidad" in df_mapa.columns and "producto" in df_mapa.columns:
+                        # Crear DataFrame con información de ventas
+                        mapa_data = coords.copy()
+                        mapa_data['cantidad'] = df_mapa.loc[coords.index, 'cantidad'].values
+                        mapa_data['producto'] = df_mapa.loc[coords.index, 'producto'].values
+                        
+                        # Mostrar puntos con tamaño según cantidad
+                        st.map(mapa_data, size='cantidad', color='#FF4B4B')
+                        
+                        # Leyenda
+                        st.caption("Tamaño de puntos representa la cantidad vendida")
+                    else:
+                        st.map(coords)
+                        
+                else:  # Análisis por densidad
+                    # Agrupar por áreas geográficas
+                    coords_rounded = coords.copy()
+                    coords_rounded['lat'] = coords_rounded['lat'].round(1)
+                    coords_rounded['lon'] = coords_rounded['lon'].round(1)
+                    
+                    densidad = coords_rounded.groupby(['lat', 'lon']).size().reset_index(name='count')
+                    densidad = densidad[densidad['count'] > 1]  # Solo áreas con múltiples puntos
+                    
+                    if len(densidad) > 0:
+                        st.map(densidad, size='count', color='#00CC96')
+                        st.caption("Áreas con mayor densidad de ventas (puntos agrupados)")
+                    else:
+                        st.map(coords)
+                        st.info("No se detectaron áreas de alta densidad")
+                
+                # Análisis adicional
+                st.write("### Análisis Geográfico")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Distribución por regiones (simulada)
+                    st.write("**Distribución aproximada por regiones:**")
+                    if len(coords) > 0:
+                        # Simular regiones basado en coordenadas
+                        norte = len(coords[coords['lat'] > 4])
+                        centro = len(coords[(coords['lat'] <= 4) & (coords['lat'] > 2)])
+                        sur = len(coords[coords['lat'] <= 2])
+                        
+                        fig_regiones, ax_regiones = plt.subplots(figsize=(8, 4))
+                        regiones = ['Norte', 'Centro', 'Sur']
+                        ventas = [norte, centro, sur]
+                        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1']
+                        
+                        bars = ax_regiones.bar(regiones, ventas, color=colors, alpha=0.8)
+                        ax_regiones.set_ylabel('Número de Ventas')
+                        ax_regiones.set_title('Distribución de Ventas por Región')
+                        
+                        # Agregar valores en las barras
+                        for bar, valor in zip(bars, ventas):
+                            ax_regiones.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
+                                           f'{valor}', ha='center', va='bottom')
+                        
+                        st.pyplot(fig_regiones)
+                
+                with col2:
+                    # Top productos por ubicación
+                    if "producto" in df_mapa.columns:
+                        st.write("**Productos más vendidos:**")
+                        top_productos = df_mapa['producto'].value_counts().head(5)
+                        
+                        fig_productos, ax_productos = plt.subplots(figsize=(8, 4))
+                        top_productos.plot(kind='barh', ax=ax_productos, color='#A78BFA')
+                        ax_productos.set_xlabel('Número de Ventas')
+                        ax_productos.set_title('Top 5 Productos Más Vendidos')
+                        plt.tight_layout()
+                        st.pyplot(fig_productos)
+                
+                # Información detallada
+                with st.expander("📊 Ver detalles de las ubicaciones"):
+                    st.write("**Resumen de coordenadas:**")
+                    st.write(f"- Latitud mínima: {coords['lat'].min():.4f}")
+                    st.write(f"- Latitud máxima: {coords['lat'].max():.4f}")
+                    st.write(f"- Longitud mínima: {coords['lon'].min():.4f}")
+                    st.write(f"- Longitud máxima: {coords['lon'].max():.4f}")
+                    st.write(f"- Centro geográfico: ({coords['lat'].mean():.4f}, {coords['lon'].mean():.4f})")
+                    
+                    # Mostrar tabla con algunas ubicaciones
+                    st.write("**Muestra de ubicaciones:**")
+                    muestra_ubicaciones = coords.head(10).copy()
+                    if "producto" in df_mapa.columns:
+                        muestra_ubicaciones['producto'] = df_mapa.loc[muestra_ubicaciones.index, 'producto'].values
+                    st.dataframe(muestra_ubicaciones)
+                    
+            else:
+                st.warning("No se encontraron coordenadas válidas en los datos.")
+                
         else:
-            st.warning("No se encontraron coordenadas en la data corregida.")
+            st.warning("No se encontró la columna 'coordenadas_envio' en los datos.")
+            st.info("""
+            **Solución sugerida:**
+            - Verifica que el archivo data6_corregido.csv contenga la columna 'coordenadas_envio'
+            - Asegúrate de que las coordenadas estén en formato: (latitud, longitud)
+            - Ejemplo: (-12.0464, -77.0428)
+            """)
+            
     except Exception as e:
         st.error(f"No se pudo cargar el mapa: {e}")
+        st.info("""
+        **Posibles soluciones:**
+        - Verifica que el archivo data/raw/data6_corregido.csv exista
+        - Asegúrate de que el archivo tenga el formato CSV correcto
+        - Revisa que las coordenadas estén en el formato esperado
+        """)
 
 # Sección: EDA
 elif menu == "EDA":
