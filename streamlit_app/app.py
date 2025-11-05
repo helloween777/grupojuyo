@@ -159,28 +159,28 @@ elif menu == "Modelos":
                 # Verificar estructura
                 if not isinstance(modelo_data, dict) or 'model' not in modelo_data:
                     st.error("Error: El modelo no tiene la estructura esperada")
-                    # En lugar de return, usar st.stop()
                     st.stop()
                     
                 modelo = modelo_data['model']
                 cat_features = modelo_data['cat_features']
                 features_esperadas = modelo_data['features']
                 
-                # Usar las features ESPECÍFICAS del modelo guardado
-                datos_muestra = datos_completos[features_esperadas].head(100)
+                st.write(f"✅ Características esperadas: {features_esperadas}")
+                st.write(f"✅ Características categóricas (índices): {cat_features}")
                 
-                # Asegurar tipos de datos correctos
-                datos_muestra = datos_muestra.astype({
-                    'tipo_cliente': 'int32',
-                    'frecuencia_mensual': 'float32',
-                    'valor_promedio_cliente': 'float32', 
-                    'producto_favorito_cliente': 'int32',
-                    'metodo_pago_habitual': 'int32',
-                    'segmento_comportamiento': 'int32',
-                    'antiguedad_meses': 'int32',
-                    'dia_semana_num': 'int32',
-                    'estacion': 'int32'
-                })
+                # Usar las features ESPECÍFICAS del modelo guardado
+                datos_muestra = datos_completos[features_esperadas].head(100).copy()
+                
+                # ✅ CORRECCIÓN CRÍTICA: Las cat_features deben ser categóricas
+                for i, col in enumerate(features_esperadas):
+                    if i in cat_features:
+                        # Mantener como categoría (CatBoost las espera así)
+                        datos_muestra[col] = datos_muestra[col].astype('category')
+                        st.write(f"🔹 {col} → tipo: category")
+                    else:
+                        # Las numéricas sí pueden ser float
+                        datos_muestra[col] = datos_muestra[col].astype('float32')
+                        st.write(f"🔸 {col} → tipo: float32")
                 
                 # Predecir CON cat_features
                 with st.spinner('Calculando predicciones de producto...'):
@@ -199,7 +199,7 @@ elif menu == "Modelos":
                     else:
                         pred_proba = pred
 
-            st.success("Predicciones completadas")
+            st.success("✅ Predicciones completadas")
             
             # Mostrar datos de entrada
             st.write("### Datos de Entrada (primeras 10 filas)")
@@ -422,6 +422,7 @@ elif menu == "Modelos":
             st.dataframe(df_predicciones)
 
         except FileNotFoundError:
-            st.error(f"No se encontró el archivo: {modelo_path}")
+            st.error(f" No se encontró el archivo: {modelo_path}")
         except Exception as e:
-            st.error(f"No se pudo cargar el modelo: {e}")
+            st.error(f" No se pudo cargar el modelo: {e}")
+            st.write("Detalles del error:", str(e))
