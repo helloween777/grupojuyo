@@ -134,7 +134,16 @@ elif menu == "Modelos":
             # CARGAR DATOS ESPECÍFICOS PARA CADA MODELO
             if seleccion == "Probabilidad de compra":
                 datos_muestra = datos_completos[features_por_modelo['compro']].head(100)
-                modelo = cargar_modelo(modelo_path)
+                modelo_data = cargar_modelo(modelo_path)
+                
+                # Verificar si es diccionario o modelo directo
+                if isinstance(modelo_data, dict) and 'model' in modelo_data:
+                    modelo = modelo_data['model']
+                    features_esperadas = modelo_data.get('features', features_por_modelo['compro'])
+                    datos_muestra = datos_completos[features_esperadas].head(100)
+                else:
+                    modelo = modelo_data
+                
                 with st.spinner('Calculando predicciones...'):
                     pred = modelo.predict(datos_muestra)
                     if hasattr(modelo, 'predict_proba'):
@@ -144,7 +153,15 @@ elif menu == "Modelos":
 
             elif seleccion == "Día de compra":
                 datos_muestra = datos_completos[features_por_modelo['dia_compra']].head(100)
-                modelo = cargar_modelo(modelo_path)
+                modelo_data = cargar_modelo(modelo_path)
+                
+                if isinstance(modelo_data, dict) and 'model' in modelo_data:
+                    modelo = modelo_data['model']
+                    features_esperadas = modelo_data.get('features', features_por_modelo['dia_compra'])
+                    datos_muestra = datos_completos[features_esperadas].head(100)
+                else:
+                    modelo = modelo_data
+                
                 with st.spinner('Calculando predicciones...'):
                     pred = modelo.predict(datos_muestra)
                     if hasattr(modelo, 'predict_proba'):
@@ -153,14 +170,19 @@ elif menu == "Modelos":
                         pred_proba = pred
 
             elif seleccion == "Producto comprado":
-                # Cargar modelo
-                modelo = cargar_modelo(modelo_path)
+                modelo_data = cargar_modelo(modelo_path)
                 
-                # Usar las features específicas para producto
-                features_esperadas = features_por_modelo['producto']
+                # Extraer modelo y features del diccionario
+                if isinstance(modelo_data, dict) and 'model' in modelo_data:
+                    modelo = modelo_data['model']
+                    features_esperadas = modelo_data.get('features', features_por_modelo['producto'])
+                else:
+                    modelo = modelo_data
+                    features_esperadas = features_por_modelo['producto']
+                
                 datos_muestra = datos_completos[features_esperadas].head(100).copy()
                 
-                # SOLUCIÓN SIMPLE: Solo convertir tipos básicos sin procesamiento complejo
+                # Procesar tipos de datos para CatBoost
                 categorical_cols = ['tipo_cliente', 'producto_favorito_cliente', 
                                   'metodo_pago_habitual', 'segmento_comportamiento', 'estacion']
                 
@@ -178,8 +200,18 @@ elif menu == "Modelos":
                         pred_proba = pred
 
             elif seleccion == "Cantidad comprada":
-                datos_muestra = datos_completos[features_por_modelo['cantidad']].head(100)
-                modelo = cargar_modelo(modelo_path)
+                modelo_data = cargar_modelo(modelo_path)
+                
+                # Extraer modelo y features del diccionario
+                if isinstance(modelo_data, dict) and 'model' in modelo_data:
+                    modelo = modelo_data['model']
+                    features_esperadas = modelo_data.get('features', features_por_modelo['cantidad'])
+                else:
+                    modelo = modelo_data
+                    features_esperadas = features_por_modelo['cantidad']
+                
+                datos_muestra = datos_completos[features_esperadas].head(100)
+                
                 with st.spinner('Calculando predicciones...'):
                     pred = modelo.predict(datos_muestra)
                     if hasattr(modelo, 'predict_proba'):
@@ -382,9 +414,8 @@ elif menu == "Modelos":
                     muy_seguros = (pred_proba > 0.9).sum()
                     st.write(f"- Clientes muy seguros (>90%): {muy_seguros}")
 
-            # ELIMINADA LA SECCIÓN DE PREDICCIONES INDIVIDUALES QUE CAUSABA EL ERROR
-
         except FileNotFoundError:
             st.error(f"No se encontró el archivo: {modelo_path}")
         except Exception as e:
             st.error(f"No se pudo cargar el modelo: {e}")
+            st.write("Detalles del error:", str(e))
