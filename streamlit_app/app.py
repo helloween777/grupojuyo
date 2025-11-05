@@ -90,14 +90,14 @@ elif menu == "Modelos":
     st.subheader("Predicción con modelos del Grupo Juyo")
 
     modelos_disponibles = {
-        "Probabilidad de compra": "mejor_modelo_compro.pkl",
-        "Día de compra": "modelo_dia_compra.pkl",
-        "Producto comprado": "modelo_producto.pkl",
-        "Cantidad comprada": "modelo_cantidad.pkl"
+        "Probabilidad de compra": "models/mejor_modelo_compro.pkl",
+        "Día de compra": "models/modelo_dia_compra.pkl",
+        "Producto comprado": "models/modelo_producto.pkl", 
+        "Cantidad comprada": "models/modelo_cantidad.pkl"
     }
 
     seleccion = st.selectbox("Selecciona un modelo", list(modelos_disponibles.keys()))
-    modelo_path = f"models/{modelos_disponibles[seleccion]}"
+    modelo_path = modelos_disponibles[seleccion]
 
     try:
         with open(modelo_path, "rb") as f:
@@ -107,24 +107,37 @@ elif menu == "Modelos":
             st.error(f"El archivo '{modelo_path}' no contiene un modelo válido. Tipo: {type(modelo)}")
         else:
             df = pd.read_csv("data/features/data6_features.csv")
+            
+            # SOLO usar las features que el modelo espera
+            features_esperadas = ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
+                                'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago']
+            
+            # Verificar que existen las features
+            features_disponibles = [f for f in features_esperadas if f in df.columns]
+            
+            if len(features_disponibles) != len(features_esperadas):
+                st.error(f"Faltan features. Esperadas: {features_esperadas}")
+                st.error(f"Disponibles: {list(df.columns)}")
+            else:
+                X_pred = df[features_esperadas]
+                
+                st.write("Datos de entrada (solo features usadas por el modelo):")
+                st.dataframe(X_pred.head())
 
-            st.write("Datos de entrada:")
-            st.dataframe(df.head())
+                pred = modelo.predict(X_pred)
 
-            pred = modelo.predict(df)
+                st.write(f"Predicciones para: {seleccion}")
+                st.write(pred)
 
-            st.write(f"Predicciones para: {seleccion}")
-            st.write(pred)
-
-            if seleccion == "Cantidad comprada":
-                st.bar_chart(pred)
-            elif seleccion == "Día de compra":
-                st.bar_chart(pd.Series(pred).value_counts().sort_index())
-            elif seleccion == "Producto comprado":
-                st.write("Distribución de productos:")
-                st.bar_chart(pd.Series(pred).value_counts())
-            elif seleccion == "Probabilidad de compra":
-                st.line_chart(pred)
+                if seleccion == "Cantidad comprada":
+                    st.bar_chart(pred)
+                elif seleccion == "Día de compra":
+                    st.bar_chart(pd.Series(pred).value_counts().sort_index())
+                elif seleccion == "Producto comprado":
+                    st.write("Distribución de productos:")
+                    st.bar_chart(pd.Series(pred).value_counts())
+                elif seleccion == "Probabilidad de compra":
+                    st.line_chart(pred)
 
     except FileNotFoundError:
         st.error(f"No se encontró el archivo: {modelo_path}")
