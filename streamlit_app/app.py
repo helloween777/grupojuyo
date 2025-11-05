@@ -205,10 +205,25 @@ elif menu == "Modelos":
                 # Extraer modelo y features del diccionario
                 if isinstance(modelo_data, dict) and 'model' in modelo_data:
                     modelo = modelo_data['model']
-                    features_esperadas = modelo_data.get('features', features_por_modelo['cantidad'])
+                    features_esperadas = modelo_data.get('features')
+                    
+                    # Si las features del modelo incluyen columnas que no existen, usar las básicas
+                    if features_esperadas:
+                        # Filtrar solo las features que existen en los datos
+                        features_disponibles = [f for f in features_esperadas if f in datos_completos.columns]
+                        if len(features_disponibles) < len(features_esperadas):
+                            st.warning(f"Algunas features no disponibles. Usando {len(features_disponibles)} de {len(features_esperadas)} features")
+                            features_esperadas = features_disponibles
+                    else:
+                        features_esperadas = features_por_modelo['cantidad']
                 else:
                     modelo = modelo_data
                     features_esperadas = features_por_modelo['cantidad']
+                
+                # Verificar que tenemos features disponibles
+                if not features_esperadas:
+                    st.error("No hay features disponibles para el modelo de cantidad")
+                    st.stop()
                 
                 datos_muestra = datos_completos[features_esperadas].head(100)
                 
@@ -220,6 +235,10 @@ elif menu == "Modelos":
                         pred_proba = pred
 
             st.success("Predicciones completadas")
+            
+            # Mostrar información de debug
+            st.write(f"Modelo: {seleccion}")
+            st.write(f"Features utilizadas: {list(datos_muestra.columns)}")
             
             # Mostrar datos de entrada
             st.write("### Datos de Entrada (primeras 10 filas)")
