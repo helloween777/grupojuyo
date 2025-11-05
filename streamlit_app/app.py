@@ -94,6 +94,14 @@ elif menu == "Modelos":
     def cargar_datos():
         df = pd.read_csv("data/features/data6_features.csv")
         
+        # PREPARAR DATOS ESPECÍFICAMENTE PARA MODELO DE CANTIDAD
+        # Crear tamaño_pedido_num si no existe (igual que en el entrenamiento)
+        if 'tamaño_pedido_num' not in df.columns and 'tamaño_pedido' in df.columns:
+            tamaño_mapping = {'Pequeño': 1, 'Mediano': 2, 'Grande': 3, 'Muy Grande': 4}
+            df['tamaño_pedido_num'] = df['tamaño_pedido'].map(tamaño_mapping)
+            # Rellenar valores nulos con 2 (Mediano)
+            df['tamaño_pedido_num'] = df['tamaño_pedido_num'].fillna(2)
+        
         # Features para CADA modelo por separado:
         features_por_modelo = {
             'compro': ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
@@ -105,8 +113,11 @@ elif menu == "Modelos":
                 'producto_favorito_cliente', 'metodo_pago_habitual', 'segmento_comportamiento',
                 'antiguedad_meses', 'dia_semana_num', 'estacion'
             ],
-            'cantidad': ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
-                        'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago']
+            'cantidad': [
+                'frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente',
+                'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago',
+                'precio_unitario', 'descuento', 'tamaño_pedido_num'  # INCLUIR todas las features del entrenamiento
+            ]
         }
         
         return df, features_por_modelo
@@ -205,40 +216,48 @@ elif menu == "Modelos":
                 # Extraer modelo y features del diccionario
                 if isinstance(modelo_data, dict) and 'model' in modelo_data:
                     modelo = modelo_data['model']
-                    features_esperadas = modelo_data.get('features')
+                    features_esperadas = modelo_data.get('features', features_por_modelo['cantidad'])
                     
-                    # Si las features del modelo incluyen columnas que no existen, usar las básicas
-                    if features_esperadas:
-                        # Filtrar solo las features que existen en los datos
-                        features_disponibles = [f for f in features_esperadas if f in datos_completos.columns]
-                        if len(features_disponibles) < len(features_esperadas):
-                            st.warning(f"Algunas features no disponibles. Usando {len(features_disponibles)} de {len(features_esperadas)} features")
-                            features_esperadas = features_disponibles
-                    else:
-                        features_esperadas = features_por_modelo['cantidad']
+                    # VERIFICAR Y PREPARAR FEATURES EXACTAMENTE COMO EN ENTRENAMIENTO
+                    features_faltantes = [f for f in features_esperadas if f not in datos_completos.columns]
+                    if features_faltantes:
+                        st.warning(f"Features faltantes: {features_faltantes}. Usando todas las disponibles.")
+                        # Usar solo las features disponibles
+                        features_esperadas = [f for f in features_esperadas if f in datos_completos.columns]
                 else:
                     modelo = modelo_data
                     features_esperadas = features_por_modelo['cantidad']
                 
-                # Verificar que tenemos features disponibles
+                # Asegurar que tenemos todas las features necesarias
                 if not features_esperadas:
                     st.error("No hay features disponibles para el modelo de cantidad")
                     st.stop()
                 
                 datos_muestra = datos_completos[features_esperadas].head(100)
                 
-                with st.spinner('Calculando predicciones...'):
+                # VERIFICAR VALORES NULOS Y PREPROCESAR
+                if datos_muestra.isnull().any().any():
+                    st.warning("Hay valores nulos en los datos. Se rellenarán con 0.")
+                    datos_muestra = datos_muestra.fillna(0)
+                
+                with st.spinner('Calculando predicciones de cantidad...'):
                     pred = modelo.predict(datos_muestra)
-                    if hasattr(modelo, 'predict_proba'):
-                        pred_proba = modelo.predict_proba(datos_muestra)[:, 1]
+                    
+                    # Para modelo de cantidad, usar las predicciones directamente como probabilidades
+                    # Normalizar entre 0 y 1 para la visualización
+                    pred_min = pred.min()
+                    pred_max = pred.max()
+                    if pred_max > pred_min:
+                        pred_proba = (pred - pred_min) / (pred_max - pred_min)
                     else:
                         pred_proba = pred
 
             st.success("Predicciones completadas")
             
-            # Mostrar información de debug
-            st.write(f"Modelo: {seleccion}")
-            st.write(f"Features utilizadas: {list(datos_muestra.columns)}")
+            # Mostrar información del modelo
+            st.write(f"**Modelo:** {seleccion}")
+            st.write(f"**Features utilizadas:** {len(datos_muestra.columns)}")
+            st.write(f"**Muestras analizadas:** {len(datos_muestra)}")
             
             # Mostrar datos de entrada
             st.write("### Datos de Entrada (primeras 10 filas)")
@@ -270,6 +289,9 @@ elif menu == "Modelos":
             elif seleccion == "Producto comprado":
                 ax.set_xlabel('Confianza del Producto Predicho')
                 ax.set_title('Distribución de Confianza en Predicciones de Producto')
+            elif seleccion == "Cantidad comprada":
+                ax.set_xlabel('Cantidad Normalizada')
+                ax.set_title('Distribución de Cantidades Predichas (Normalizadas)')
             else:
                 ax.set_xlabel('Probabilidad')
                 ax.set_title('Distribución de las Predicciones')
@@ -301,6 +323,18 @@ elif menu == "Modelos":
                     resultados_umbral.append({
                         'Umbral': umbral,
                         'Clientes Alta Confianza': alta_confianza,
+                        'Porcentaje': f'{porcentaje:.1f}%'
+                    })
+            elif seleccion == "Cantidad comprada":
+                # Umbrales específicos para cantidad
+                umbrales = [0.25, 0.5, 0.75]
+                resultados_umbral = []
+                for umbral in umbrales:
+                    alta_cantidad = (pred_proba > umbral).sum()
+                    porcentaje = (alta_cantidad / len(pred_proba)) * 100
+                    resultados_umbral.append({
+                        'Umbral': umbral,
+                        'Clientes Alta Cantidad': alta_cantidad,
                         'Porcentaje': f'{porcentaje:.1f}%'
                     })
             else:
@@ -336,6 +370,14 @@ elif menu == "Modelos":
                     (0.2, 0.4, 'Confianza Media'),
                     (0.4, 0.7, 'Alta Confianza'),
                     (0.7, 1.01, 'Muy Alta Confianza')
+                ]
+            elif seleccion == "Cantidad comprada":
+                segmentos = [
+                    (0.0, 0.2, 'Baja Cantidad'),
+                    (0.2, 0.4, 'Cantidad Media-Baja'), 
+                    (0.4, 0.6, 'Cantidad Media'),
+                    (0.6, 0.8, 'Cantidad Media-Alta'),
+                    (0.8, 1.01, 'Alta Cantidad')
                 ]
             else:
                 segmentos = [
@@ -414,6 +456,10 @@ elif menu == "Modelos":
                     alta_conf = (pred_proba > 0.4).sum()
                     st.write(f"- Clientes con alta confianza (>40%): {alta_conf} ({alta_conf/len(pred_proba)*100:.1f}%)")
                     st.write(f"- Confianza promedio: {pred_proba.mean():.1%}")
+                elif seleccion == "Cantidad comprada":
+                    alta_cant = (pred_proba > 0.5).sum()
+                    st.write(f"- Clientes con alta cantidad (>50%): {alta_cant} ({alta_cant/len(pred_proba)*100:.1f}%)")
+                    st.write(f"- Cantidad promedio: {pred_proba.mean():.1%}")
                 else:
                     st.write(f"- Clientes objetivo: {len(pred_proba)}")
                     st.write(f"- Probabilidad promedio: {pred_proba.mean():.1%}")
@@ -429,6 +475,9 @@ elif menu == "Modelos":
                 elif seleccion == "Producto comprado":
                     muy_seguros = (pred_proba > 0.7).sum()
                     st.write(f"- Clientes muy seguros (>70%): {muy_seguros}")
+                elif seleccion == "Cantidad comprada":
+                    muy_alta_cant = (pred_proba > 0.8).sum()
+                    st.write(f"- Clientes con muy alta cantidad (>80%): {muy_alta_cant}")
                 else:
                     muy_seguros = (pred_proba > 0.9).sum()
                     st.write(f"- Clientes muy seguros (>90%): {muy_seguros}")
