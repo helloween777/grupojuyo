@@ -181,6 +181,15 @@ elif menu == "Modelos":
                     pred_proba = modelo.predict_proba(datos_muestra, cat_features=cat_features)
                     # Para multiclase, usar la probabilidad máxima como score
                     pred_proba = np.max(pred_proba, axis=1)
+                
+            else:
+                st.error("Error: El archivo no tiene la estructura esperada")
+                st.write("Contenido cargado:", modelo_data)
+            return
+            
+        except Exception as e:
+            st.error(f"Error al cargar el modelo: {e}")
+            return
                     
             else:
                 # Para otros modelos (carga normal)
