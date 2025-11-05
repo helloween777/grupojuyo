@@ -93,19 +93,17 @@ elif menu == "Modelos":
     @st.cache_data
     def cargar_datos():
         df = pd.read_csv("data/features/data6_features.csv")
-        features_esperadas = ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
-                            'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago']
-        return df[features_esperadas] if all(f in df.columns for f in features_esperadas) else None
+        # Features para diferentes modelos
+        features_compro = ['frecuencia_mensual', 'antiguedad_meses', 'valor_promedio_cliente', 
+                          'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago']
+        return df, features_compro
     
     @st.cache_resource
     def cargar_modelo(modelo_path):
         with open(modelo_path, "rb") as f:
             return pickle.load(f)
     
-    datos = cargar_datos()
-    if datos is None:
-        st.error("No se encontraron las features necesarias en el CSV")
-        st.stop()
+    datos_completos, features_compro = cargar_datos()
     
     modelos_disponibles = {
         "Probabilidad de compra": "models/mejor_modelo_compro.pkl",
@@ -123,7 +121,7 @@ elif menu == "Modelos":
             modelo = cargar_modelo(modelo_path)
             
             # Usar solo 100 filas para mejor rendimiento
-            datos_muestra = datos.head(100)
+            datos_muestra = datos_completos[features_compro].head(100)
             
             with st.spinner('Calculando predicciones...'):
                 pred = modelo.predict(datos_muestra)
@@ -154,37 +152,68 @@ elif menu == "Modelos":
             st.write("### Distribución de Probabilidades")
             fig, ax = plt.subplots(figsize=(10, 6))
             ax.hist(pred_proba, bins=20, alpha=0.7, color='blue', edgecolor='black')
-            ax.set_xlabel('Probabilidad de Compra')
+            
+            if seleccion == "Día de compra":
+                ax.set_xlabel('Probabilidad de Compra el Martes')
+                ax.set_title('Distribución de Probabilidades de Compra el Martes')
+            elif seleccion == "Probabilidad de compra":
+                ax.set_xlabel('Probabilidad de Compra')
+                ax.set_title('Distribución de Probabilidades de Compra')
+            else:
+                ax.set_xlabel('Probabilidad')
+                ax.set_title('Distribución de las Predicciones')
+                
             ax.set_ylabel('Frecuencia')
-            ax.set_title('Distribución de las Predicciones del Modelo')
             ax.grid(True, alpha=0.3)
             st.pyplot(fig)
 
             # ANÁLISIS DE UMBRALES
             st.write("### Análisis de Umbrales de Decisión")
-            umbrales = [0.3, 0.5, 0.7, 0.9]
-            resultados_umbral = []
-
-            for umbral in umbrales:
-                compras_predichas = (pred_proba > umbral).sum()
-                porcentaje = (compras_predichas / len(pred_proba)) * 100
-                resultados_umbral.append({
-                    'Umbral': umbral,
-                    'Clientes que Comprarían': compras_predichas,
-                    'Porcentaje': f'{porcentaje:.1f}%'
-                })
+            
+            if seleccion == "Día de compra":
+                umbrales = [0.3, 0.5, 0.7]
+                resultados_umbral = []
+                for umbral in umbrales:
+                    martes_predichos = (pred_proba > umbral).sum()
+                    porcentaje = (martes_predichos / len(pred_proba)) * 100
+                    resultados_umbral.append({
+                        'Umbral': umbral,
+                        'Clientes Martes': martes_predichos,
+                        'Porcentaje': f'{porcentaje:.1f}%'
+                    })
+            else:
+                umbrales = [0.3, 0.5, 0.7, 0.9]
+                resultados_umbral = []
+                for umbral in umbrales:
+                    compras_predichas = (pred_proba > umbral).sum()
+                    porcentaje = (compras_predichas / len(pred_proba)) * 100
+                    resultados_umbral.append({
+                        'Umbral': umbral,
+                        'Clientes que Comprarían': compras_predichas,
+                        'Porcentaje': f'{porcentaje:.1f}%'
+                    })
 
             df_umbrales = pd.DataFrame(resultados_umbral)
             st.dataframe(df_umbrales)
 
             # SEGMENTACIÓN DE CLIENTES
             st.write("### Segmentación de Clientes")
-            segmentos = [
-                (0.0, 0.3, 'Baja Probabilidad'),
-                (0.3, 0.7, 'Media Probabilidad'), 
-                (0.7, 0.9, 'Alta Probabilidad'),
-                (0.9, 1.01, 'Muy Alta Probabilidad')
-            ]
+            
+            if seleccion == "Día de compra":
+                segmentos = [
+                    (0.0, 0.2, 'Muy Probable Lunes'),
+                    (0.2, 0.4, 'Probable Lunes'), 
+                    (0.4, 0.6, 'Indeciso'),
+                    (0.6, 0.8, 'Probable Martes'),
+                    (0.8, 1.01, 'Muy Probable Martes')
+                ]
+            else:
+                segmentos = [
+                    (0.0, 0.3, 'Baja Probabilidad'),
+                    (0.3, 0.7, 'Media Probabilidad'), 
+                    (0.7, 0.9, 'Alta Probabilidad'),
+                    (0.9, 1.01, 'Muy Alta Probabilidad')
+                ]
 
             datos_segmentos = []
             for min_p, max_p, nombre in segmentos:
@@ -201,7 +230,7 @@ elif menu == "Modelos":
 
             # GRÁFICO DE SEGMENTOS
             fig2, ax2 = plt.subplots(figsize=(10, 6))
-            ax2.bar(df_segmentos['Segmento'], df_segmentos['Clientes'], color=['#ff6b6b', '#ffd166', '#06d6a0', '#118ab2'])
+            ax2.bar(df_segmentos['Segmento'], df_segmentos['Clientes'], color=['#ff6b6b', '#ffd166', '#06d6a0', '#118ab2', '#073b4c'][:len(segmentos)])
             ax2.set_ylabel('Número de Clientes')
             ax2.set_title('Distribución de Clientes por Segmento')
             ax2.tick_params(axis='x', rotation=45)
@@ -241,21 +270,50 @@ elif menu == "Modelos":
             with col1:
                 st.write("**Métricas Clave:**")
                 st.write(f"- Total clientes analizados: {len(pred_proba)}")
-                st.write(f"- Clientes con alta probabilidad (>70%): {(pred_proba > 0.7).sum()} ({(pred_proba > 0.7).sum()/len(pred_proba)*100:.1f}%)")
-                st.write(f"- Confianza promedio: {pred_proba.mean():.1%}")
+                
+                if seleccion == "Día de compra":
+                    martes_predichos = (pred_proba > 0.5).sum()
+                    st.write(f"- Clientes que comprarán Martes: {martes_predichos} ({martes_predichos/len(pred_proba)*100:.1f}%)")
+                    st.write(f"- Probabilidad promedio Martes: {pred_proba.mean():.1%}")
+                elif seleccion == "Probabilidad de compra":
+                    alta_prob = (pred_proba > 0.7).sum()
+                    st.write(f"- Clientes con alta probabilidad (>70%): {alta_prob} ({alta_prob/len(pred_proba)*100:.1f}%)")
+                    st.write(f"- Confianza promedio: {pred_proba.mean():.1%}")
+                else:
+                    st.write(f"- Clientes objetivo: {len(pred_proba)}")
+                    st.write(f"- Probabilidad promedio: {pred_proba.mean():.1%}")
                 
             with col2:
                 st.write("**Evaluación del Modelo:**")
                 st.write(f"- Variabilidad: {'Alta' if pred_proba.std() > 0.1 else 'Moderada' if pred_proba.std() > 0.05 else 'Baja'}")
                 st.write(f"- Rango de predicciones: {pred_proba.max() - pred_proba.min():.3f}")
-                st.write(f"- Clientes muy seguros (>90%): {(pred_proba > 0.9).sum()}")
+                
+                if seleccion == "Día de compra":
+                    muy_martes = (pred_proba > 0.8).sum()
+                    st.write(f"- Clientes muy seguros de Martes (>80%): {muy_martes}")
+                else:
+                    muy_seguros = (pred_proba > 0.9).sum()
+                    st.write(f"- Clientes muy seguros (>90%): {muy_seguros}")
 
             # PREDICCIONES INDIVIDUALES
             st.write("### Predicciones Individuales (primeras 10)")
-            df_predicciones = pd.DataFrame({
-                'Probabilidad_Compra': pred_proba[:10],
-                'Decisión': ['COMPRA' if p > 0.5 else 'NO COMPRA' for p in pred_proba[:10]]
-            })
+            
+            if seleccion == "Día de compra":
+                df_predicciones = pd.DataFrame({
+                    'Probabilidad_Martes': pred_proba[:10],
+                    'Día_Predicho': ['MARTES' if p > 0.5 else 'LUNES' for p in pred_proba[:10]]
+                })
+            elif seleccion == "Probabilidad de compra":
+                df_predicciones = pd.DataFrame({
+                    'Probabilidad_Compra': pred_proba[:10],
+                    'Decisión': ['COMPRA' if p > 0.5 else 'NO COMPRA' for p in pred_proba[:10]]
+                })
+            else:
+                df_predicciones = pd.DataFrame({
+                    'Probabilidad': pred_proba[:10],
+                    'Predicción': pred_proba[:10]
+                })
+            
             st.dataframe(df_predicciones)
 
         except FileNotFoundError:
