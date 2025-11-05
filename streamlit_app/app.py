@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""app.ipynb
-
-Original file is located at
-    https://colab.research.google.com/drive/1CzDZnFq4QJqJNt7Oyxw5qMmY683PDNAV
-"""
+"""app.ipynb"""
 
 # streamlit_app/app.py
 
@@ -16,10 +12,9 @@ import pickle
 st.set_page_config(page_title="Grupo Juyo", layout="wide")
 sns.set(style="whitegrid")
 plt.switch_backend("Agg")
-st.set_option('deprecation.showPyplotGlobalUse', False)
 
 # Carátula
-st.image("https://copilot.microsoft.com/th/id/BCO.3345d9e9-667d-460a-91a0-b556a8c6e75d.png", use_column_width=True)
+st.image("streamlit_app/assets/portada_juyo.png", use_column_width=True)
 st.title("Modelamiento Grupo Juyo")
 
 # Menú lateral
@@ -65,24 +60,26 @@ elif menu == "EDA":
         st.write(df.isnull().sum())
 
         st.write("Correlaciones:")
-        plt.figure(figsize=(10, 6))
-        sns.heatmap(df.select_dtypes(include="number").corr(), annot=True, cmap="viridis")
-        st.pyplot(plt)
+        fig1, ax1 = plt.subplots(figsize=(10, 6))
+        sns.heatmap(df.select_dtypes(include="number").corr(), annot=True, cmap="viridis", ax=ax1)
+        st.pyplot(fig1)
 
         st.write("Distribuciones:")
-        df.select_dtypes(include="number").hist(figsize=(12, 8))
+        fig2 = df.select_dtypes(include="number").hist(figsize=(12, 8))
         st.pyplot(plt)
 
         if "frecuencia_mensual" in df.columns:
             st.write("Frecuencia mensual de compra:")
-            sns.histplot(df["frecuencia_mensual"].dropna(), bins=30, kde=True)
-            st.pyplot()
+            fig3, ax3 = plt.subplots()
+            sns.histplot(df["frecuencia_mensual"].dropna(), bins=30, kde=True, ax=ax3)
+            st.pyplot(fig3)
 
         if "variabilidad_monto_cliente" in df.columns and "segmento_comportamiento" in df.columns:
             st.write("Variabilidad del monto por segmento:")
-            sns.boxplot(x="segmento_comportamiento", y="variabilidad_monto_cliente", data=df)
-            plt.xticks(rotation=45)
-            st.pyplot()
+            fig4, ax4 = plt.subplots()
+            sns.boxplot(x="segmento_comportamiento", y="variabilidad_monto_cliente", data=df, ax=ax4)
+            ax4.set_xticklabels(ax4.get_xticklabels(), rotation=45)
+            st.pyplot(fig4)
 
     except Exception as e:
         st.error(f"No se pudo cargar el archivo: {e}")
@@ -92,10 +89,10 @@ elif menu == "Modelos":
     st.subheader("Predicción con modelos del Grupo Juyo")
 
     modelos_disponibles = {
-        "Cantidad comprada": "modelo_cantidad.pkl",
-        "Probabilidad de compra": "modelo_compra.pkl",
+        "Probabilidad de compra": "modelo_compro.pkl",
         "Día de compra": "modelo_dia_compra.pkl",
-        "Producto comprado": "modelo_producto.pkl"
+        "Producto comprado": "modelo_producto.pkl",
+        "Cantidad comprada": "modelo_cantidad.pkl"
     }
 
     seleccion = st.selectbox("Selecciona un modelo", list(modelos_disponibles.keys()))
