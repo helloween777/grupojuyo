@@ -89,7 +89,7 @@ elif menu == "Modelos":
     st.subheader("Predicción con modelos del Grupo Juyo")
 
     modelos_disponibles = {
-        "Probabilidad de compra": "modelo_compro.pkl",
+        "Probabilidad de compra": "mejor_modelo_compro.pkl",
         "Día de compra": "modelo_dia_compra.pkl",
         "Producto comprado": "modelo_producto.pkl",
         "Cantidad comprada": "modelo_cantidad.pkl"
