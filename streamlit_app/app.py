@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
+import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 
 st.write("RandomForestRegressor disponible.")
