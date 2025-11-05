@@ -85,11 +85,11 @@ elif menu == "EDA":
     except Exception as e:
         st.error(f"No se pudo cargar el archivo: {e}")
 
-# Sección: Modelos 
+# Sección: Modelos
 elif menu == "Modelos":
     st.subheader("Predicción con modelos del Grupo Juyo")
     
-    # Cargar datos UNA sola vez y cachearlos
+    # Cachear datos y modelos para mejor rendimiento
     @st.cache_data
     def cargar_datos():
         df = pd.read_csv("data/features/data6_features.csv")
@@ -97,8 +97,12 @@ elif menu == "Modelos":
                             'es_fin_de_semana', 'variabilidad_monto_cliente', 'consistencia_metodo_pago']
         return df[features_esperadas] if all(f in df.columns for f in features_esperadas) else None
     
-    datos = cargar_datos()
+    @st.cache_resource
+    def cargar_modelo(modelo_path):
+        with open(modelo_path, "rb") as f:
+            return pickle.load(f)
     
+    datos = cargar_datos()
     if datos is None:
         st.error("No se encontraron las features necesarias en el CSV")
         st.stop()
@@ -116,36 +120,147 @@ elif menu == "Modelos":
         modelo_path = modelos_disponibles[seleccion]
 
         try:
-            with open(modelo_path, "rb") as f:
-                modelo = pickle.load(f)
-
-            if not hasattr(modelo, "predict"):
-                st.error(f"El archivo no contiene un modelo válido. Tipo: {type(modelo)}")
-            else:
-                # Usar solo las primeras 100 filas para prueba
-                datos_muestra = datos.head(100)
-                
-                st.write("Datos de entrada (primeras 100 filas):")
-                st.dataframe(datos_muestra.head(10))
-
+            modelo = cargar_modelo(modelo_path)
+            
+            # Usar solo 100 filas para mejor rendimiento
+            datos_muestra = datos.head(100)
+            
+            with st.spinner('Calculando predicciones...'):
                 pred = modelo.predict(datos_muestra)
-                pred_proba = modelo.predict_proba(datos_muestra)[:, 1] if hasattr(modelo, 'predict_proba') else pred
+                if hasattr(modelo, 'predict_proba'):
+                    pred_proba = modelo.predict_proba(datos_muestra)[:, 1]
+                else:
+                    pred_proba = pred
 
-                st.write(f"Predicciones para: {seleccion}")
-                st.write(f"Rango de predicciones: {pred_proba.min():.3f} - {pred_proba.max():.3f}")
+            st.success("Predicciones completadas")
+            
+            # Mostrar datos de entrada
+            st.write("### Datos de Entrada (primeras 10 filas)")
+            st.dataframe(datos_muestra.head(10))
+
+            # Mostrar estadísticas básicas
+            st.write("### Estadísticas de Predicciones")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Mínimo", f"{pred_proba.min():.3f}")
+            with col2:
+                st.metric("Máximo", f"{pred_proba.max():.3f}")
+            with col3:
+                st.metric("Promedio", f"{pred_proba.mean():.3f}")
+            with col4:
+                st.metric("Desviación", f"{pred_proba.std():.3f}")
+
+            # DISTRIBUCIÓN DE LAS PREDICCIONES
+            st.write("### Distribución de Probabilidades")
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.hist(pred_proba, bins=20, alpha=0.7, color='blue', edgecolor='black')
+            ax.set_xlabel('Probabilidad de Compra')
+            ax.set_ylabel('Frecuencia')
+            ax.set_title('Distribución de las Predicciones del Modelo')
+            ax.grid(True, alpha=0.3)
+            st.pyplot(fig)
+
+            # ANÁLISIS DE UMBRALES
+            st.write("### Análisis de Umbrales de Decisión")
+            umbrales = [0.3, 0.5, 0.7, 0.9]
+            resultados_umbral = []
+
+            for umbral in umbrales:
+                compras_predichas = (pred_proba > umbral).sum()
+                porcentaje = (compras_predichas / len(pred_proba)) * 100
+                resultados_umbral.append({
+                    'Umbral': umbral,
+                    'Clientes que Comprarían': compras_predichas,
+                    'Porcentaje': f'{porcentaje:.1f}%'
+                })
+
+            df_umbrales = pd.DataFrame(resultados_umbral)
+            st.dataframe(df_umbrales)
+
+            # SEGMENTACIÓN DE CLIENTES
+            st.write("### Segmentación de Clientes")
+            segmentos = [
+                (0.0, 0.3, 'Baja Probabilidad'),
+                (0.3, 0.7, 'Media Probabilidad'), 
+                (0.7, 0.9, 'Alta Probabilidad'),
+                (0.9, 1.01, 'Muy Alta Probabilidad')
+            ]
+
+            datos_segmentos = []
+            for min_p, max_p, nombre in segmentos:
+                count = ((pred_proba >= min_p) & (pred_proba < max_p)).sum()
+                porcentaje = (count / len(pred_proba)) * 100
+                datos_segmentos.append({
+                    'Segmento': nombre,
+                    'Clientes': count,
+                    'Porcentaje': f'{porcentaje:.1f}%'
+                })
+
+            df_segmentos = pd.DataFrame(datos_segmentos)
+            st.dataframe(df_segmentos)
+
+            # GRÁFICO DE SEGMENTOS
+            fig2, ax2 = plt.subplots(figsize=(10, 6))
+            ax2.bar(df_segmentos['Segmento'], df_segmentos['Clientes'], color=['#ff6b6b', '#ffd166', '#06d6a0', '#118ab2'])
+            ax2.set_ylabel('Número de Clientes')
+            ax2.set_title('Distribución de Clientes por Segmento')
+            ax2.tick_params(axis='x', rotation=45)
+            
+            for i, v in enumerate(df_segmentos['Clientes']):
+                ax2.text(i, v + 0.5, str(v), ha='center', va='bottom')
                 
-                # Mostrar estadísticas de las predicciones
-                st.write("Estadísticas de predicciones:")
-                st.write(f"- Mínimo: {pred_proba.min():.3f}")
-                st.write(f"- Máximo: {pred_proba.max():.3f}")
-                st.write(f"- Promedio: {pred_proba.mean():.3f}")
-                st.write(f"- Desviación: {pred_proba.std():.3f}")
+            plt.tight_layout()
+            st.pyplot(fig2)
 
-                if seleccion == "Probabilidad de compra":
-                    st.line_chart(pred_proba)
-                    # Si todas las predicciones son iguales, mostrar advertencia
-                    if pred_proba.std() < 0.01:
-                        st.warning("⚠️ Todas las predicciones son muy similares. El modelo podría no estar funcionando correctamente.")
+            # IMPORTANCIA DE CARACTERÍSTICAS (si está disponible)
+            if hasattr(modelo, 'feature_importances_'):
+                st.write("### Importancia de Características")
+                
+                importancia = modelo.feature_importances_
+                caracteristicas = datos_muestra.columns
+                
+                df_importancia = pd.DataFrame({
+                    'Característica': caracteristicas,
+                    'Importancia': importancia
+                }).sort_values('Importancia', ascending=False)
+                
+                st.dataframe(df_importancia)
+                
+                # Gráfico de importancia
+                fig3, ax3 = plt.subplots(figsize=(10, 6))
+                ax3.barh(df_importancia['Característica'], df_importancia['Importancia'])
+                ax3.set_xlabel('Importancia')
+                ax3.set_title('Importancia de Características en el Modelo')
+                plt.tight_layout()
+                st.pyplot(fig3)
 
+            # RESUMEN EJECUTIVO
+            st.write("### Resumen Ejecutivo")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Métricas Clave:**")
+                st.write(f"- Total clientes analizados: {len(pred_proba)}")
+                st.write(f"- Clientes con alta probabilidad (>70%): {(pred_proba > 0.7).sum()} ({(pred_proba > 0.7).sum()/len(pred_proba)*100:.1f}%)")
+                st.write(f"- Confianza promedio: {pred_proba.mean():.1%}")
+                
+            with col2:
+                st.write("**Evaluación del Modelo:**")
+                st.write(f"- Variabilidad: {'Alta' if pred_proba.std() > 0.1 else 'Moderada' if pred_proba.std() > 0.05 else 'Baja'}")
+                st.write(f"- Rango de predicciones: {pred_proba.max() - pred_proba.min():.3f}")
+                st.write(f"- Clientes muy seguros (>90%): {(pred_proba > 0.9).sum()}")
+
+            # PREDICCIONES INDIVIDUALES
+            st.write("### Predicciones Individuales (primeras 10)")
+            df_predicciones = pd.DataFrame({
+                'Probabilidad_Compra': pred_proba[:10],
+                'Decisión': ['COMPRA' if p > 0.5 else 'NO COMPRA' for p in pred_proba[:10]]
+            })
+            st.dataframe(df_predicciones)
+
+        except FileNotFoundError:
+            st.error(f"No se encontró el archivo: {modelo_path}")
         except Exception as e:
             st.error(f"No se pudo cargar el modelo: {e}")
+
+
