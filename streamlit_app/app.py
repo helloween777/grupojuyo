@@ -16,7 +16,7 @@ sns.set(style="whitegrid")
 plt.switch_backend("Agg")
 
 # Carátula
-st.image("streamlit_app/assets/portada_juyo.png", width=50) 
+st.image("streamlit_app/assets/portada_juyo.png", width=500) 
 st.title("Modelamiento Grupo Juyo")
 
 # Menú lateral
