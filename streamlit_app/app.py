@@ -137,7 +137,7 @@ if menu == "Mapa":
                         st.pyplot(fig_productos)
                 
                 # Información detallada
-                with st.expander("📊 Ver detalles de las ubicaciones"):
+                with st.expander("Ver detalles de las ubicaciones"):
                     st.write("**Resumen de coordenadas:**")
                     st.write(f"- Latitud mínima: {coords['lat'].min():.4f}")
                     st.write(f"- Latitud máxima: {coords['lat'].max():.4f}")
@@ -208,7 +208,7 @@ if menu == "Mapa":
                     
                     # Opción para descargar ubicaciones con nombres
                     st.download_button(
-                        label="📥 Descargar muestra de ubicaciones",
+                        label="Descargar muestra de ubicaciones",
                         data=muestra_ubicaciones.to_csv(index=False),
                         file_name="muestra_ubicaciones_juyo.csv",
                         mime="text/csv"
