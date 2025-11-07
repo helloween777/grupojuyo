@@ -8,6 +8,7 @@ import seaborn as sns
 import pickle
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
+from geopy.geocoders import Nominatim
 
 
 st.set_page_config(page_title="Grupo Juyo", layout="wide")
@@ -136,7 +137,7 @@ if menu == "Mapa":
                         st.pyplot(fig_productos)
                 
                 # Información detallada
-                with st.expander("Ver detalles de las ubicaciones"):
+                with st.expander("📊 Ver detalles de las ubicaciones"):
                     st.write("**Resumen de coordenadas:**")
                     st.write(f"- Latitud mínima: {coords['lat'].min():.4f}")
                     st.write(f"- Latitud máxima: {coords['lat'].max():.4f}")
@@ -144,12 +145,74 @@ if menu == "Mapa":
                     st.write(f"- Longitud máxima: {coords['lon'].max():.4f}")
                     st.write(f"- Centro geográfico: ({coords['lat'].mean():.4f}, {coords['lon'].mean():.4f})")
                     
-                    # Mostrar tabla con algunas ubicaciones
+                    # FUNCIÓN PARA OBTENER NOMBRES DE UBICACIONES
+                    @st.cache_data
+                    def obtener_nombre_ubicacion(lat, lon):
+                        """
+                        Obtiene el nombre de la ubicación usando geocodificación inversa
+                        """
+                        try:
+                            geolocator = Nominatim(user_agent="juyo_maps_app")
+                            location = geolocator.reverse((lat, lon), exactly_one=True, language='es')
+                            if location:
+                                address = location.raw.get('address', {})
+                                # Priorizar diferentes niveles de ubicación
+                                if 'city' in address:
+                                    return address['city']
+                                elif 'town' in address:
+                                    return address['town']
+                                elif 'municipality' in address:
+                                    return address['municipality']
+                                elif 'village' in address:
+                                    return address['village']
+                                elif 'county' in address:
+                                    return address['county']
+                                elif 'state' in address:
+                                    return address['state']
+                                elif 'country' in address:
+                                    return address['country']
+                                else:
+                                    return "Ubicación no especificada"
+                            return "No encontrado"
+                        except Exception:
+                            return "Error en geocodificación"
+                    
+                    # Obtener nombres de ubicaciones para las primeras 10 coordenadas
                     st.write("**Muestra de ubicaciones:**")
                     muestra_ubicaciones = coords.head(10).copy()
+                    
+                    # Agregar nombres de ubicaciones
+                    with st.spinner('Obteniendo nombres de ubicaciones...'):
+                        muestra_ubicaciones['ubicacion'] = muestra_ubicaciones.apply(
+                            lambda row: obtener_nombre_ubicacion(row['lat'], row['lon']), 
+                            axis=1
+                        )
+                    
+                    # Agregar información adicional si existe en el dataset original
                     if "producto" in df_mapa.columns:
                         muestra_ubicaciones['producto'] = df_mapa.loc[muestra_ubicaciones.index, 'producto'].values
+                    if "cantidad" in df_mapa.columns:
+                        muestra_ubicaciones['cantidad'] = df_mapa.loc[muestra_ubicaciones.index, 'cantidad'].values
+                    if "cliente" in df_mapa.columns:
+                        muestra_ubicaciones['cliente'] = df_mapa.loc[muestra_ubicaciones.index, 'cliente'].values
+                    
+                    # Mostrar tabla mejorada
                     st.dataframe(muestra_ubicaciones)
+                    
+                    # Análisis de ubicaciones principales
+                    st.write("**Ubicaciones principales encontradas:**")
+                    ubicaciones_principales = muestra_ubicaciones['ubicacion'].value_counts()
+                    if len(ubicaciones_principales) > 0:
+                        for ubicacion, count in ubicaciones_principales.items():
+                            st.write(f"- {ubicacion}: {count} venta(s)")
+                    
+                    # Opción para descargar ubicaciones con nombres
+                    st.download_button(
+                        label="📥 Descargar muestra de ubicaciones",
+                        data=muestra_ubicaciones.to_csv(index=False),
+                        file_name="muestra_ubicaciones_juyo.csv",
+                        mime="text/csv"
+                    )
                     
             else:
                 st.warning("No se encontraron coordenadas válidas en los datos.")
