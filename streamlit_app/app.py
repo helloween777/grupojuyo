@@ -390,6 +390,9 @@ elif menu == "Modelos":
     
     datos_completos, features_por_modelo = cargar_datos()
     
+    # OBTENER EL NÚMERO MÁXIMO DE CLIENTES DISPONIBLES
+    max_clientes = len(datos_completos)
+    
     modelos_disponibles = {
         "Probabilidad de compra": "models/mejor_modelo_compro.pkl",
         "Día de compra": "models/modelo_dia_compra.pkl",
@@ -399,24 +402,52 @@ elif menu == "Modelos":
 
     seleccion = st.selectbox("Selecciona un modelo", list(modelos_disponibles.keys()))
     
+    # SELECTOR DE CANTIDAD DE MUESTRA
+    st.write("### Configuración de la muestra")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Input numérico para ingresar la cantidad manualmente
+        cantidad_muestra = st.number_input(
+            "Número de clientes a analizar:",
+            min_value=1,
+            max_value=max_clientes,
+            value=1500,  # Valor por defecto
+            step=100,
+            help=f"Ingresa el número de clientes a analizar (máximo {max_clientes})"
+        )
+    
+    with col2:
+        # Mostrar información de la muestra
+        st.metric("Clientes disponibles", max_clientes)
+        st.metric("Muestra seleccionada", cantidad_muestra)
+    
+    # Validación de la cantidad seleccionada
+    if cantidad_muestra > max_clientes:
+        st.error(f"❌ No se cuenta con {cantidad_muestra} clientes en la base de datos. Solo hay {max_clientes} clientes disponibles.")
+        st.stop()
+    
     if st.button("Ejecutar Predicción"):
         modelo_path = modelos_disponibles[seleccion]
 
         try:
             # CARGAR DATOS ESPECÍFICOS PARA CADA MODELO
             if seleccion == "Probabilidad de compra":
-                datos_muestra = datos_completos[features_por_modelo['compro']].head(1500)
+                # USAR LA CANTIDAD SELECCIONADA POR EL USUARIO
+                datos_muestra = datos_completos[features_por_modelo['compro']].head(cantidad_muestra)
                 modelo_data = cargar_modelo(modelo_path)
                 
                 # Verificar si es diccionario o modelo directo
                 if isinstance(modelo_data, dict) and 'model' in modelo_data:
                     modelo = modelo_data['model']
                     features_esperadas = modelo_data.get('features', features_por_modelo['compro'])
-                    datos_muestra = datos_completos[features_esperadas].head(1500)
+                    # USAR LA CANTIDAD SELECCIONADA POR EL USUARIO
+                    datos_muestra = datos_completos[features_esperadas].head(cantidad_muestra)
                 else:
                     modelo = modelo_data
                 
-                with st.spinner('Calculando predicciones...'):
+                with st.spinner(f'Calculando predicciones para {len(datos_muestra)} clientes...'):
                     pred = modelo.predict(datos_muestra)
                     if hasattr(modelo, 'predict_proba'):
                         pred_proba = modelo.predict_proba(datos_muestra)[:, 1]
@@ -424,17 +455,19 @@ elif menu == "Modelos":
                         pred_proba = pred
 
             elif seleccion == "Día de compra":
-                datos_muestra = datos_completos[features_por_modelo['dia_compra']].head(1500)
+                # USAR LA CANTIDAD SELECCIONADA POR EL USUARIO
+                datos_muestra = datos_completos[features_por_modelo['dia_compra']].head(cantidad_muestra)
                 modelo_data = cargar_modelo(modelo_path)
                 
                 if isinstance(modelo_data, dict) and 'model' in modelo_data:
                     modelo = modelo_data['model']
                     features_esperadas = modelo_data.get('features', features_por_modelo['dia_compra'])
-                    datos_muestra = datos_completos[features_esperadas].head(1500)
+                    # USAR LA CANTIDAD SELECCIONADA POR EL USUARIO
+                    datos_muestra = datos_completos[features_esperadas].head(cantidad_muestra)
                 else:
                     modelo = modelo_data
                 
-                with st.spinner('Calculando predicciones...'):
+                with st.spinner(f'Calculando predicciones para {len(datos_muestra)} clientes...'):
                     pred = modelo.predict(datos_muestra)
                     if hasattr(modelo, 'predict_proba'):
                         pred_proba = modelo.predict_proba(datos_muestra)[:, 1]
@@ -452,7 +485,8 @@ elif menu == "Modelos":
                     modelo = modelo_data
                     features_esperadas = features_por_modelo['producto']
                 
-                datos_muestra = datos_completos[features_esperadas].head(1500).copy()
+                # USAR LA CANTIDAD SELECCIONADA POR EL USUARIO
+                datos_muestra = datos_completos[features_esperadas].head(cantidad_muestra).copy()
                 
                 # Procesar tipos de datos para CatBoost
                 categorical_cols = ['tipo_cliente', 'producto_favorito_cliente', 
@@ -463,7 +497,7 @@ elif menu == "Modelos":
                         datos_muestra[col] = datos_muestra[col].astype('category')
                 
                 # Predecir
-                with st.spinner('Calculando predicciones de producto...'):
+                with st.spinner(f'Calculando predicciones de producto para {len(datos_muestra)} clientes...'):
                     pred = modelo.predict(datos_muestra)
                     if hasattr(modelo, 'predict_proba'):
                         pred_proba = modelo.predict_proba(datos_muestra)
@@ -494,14 +528,15 @@ elif menu == "Modelos":
                     st.error("No hay features disponibles para el modelo de cantidad")
                     st.stop()
                 
-                datos_muestra = datos_completos[features_esperadas].head(1500)
+                # USAR LA CANTIDAD SELECCIONADA POR EL USUARIO
+                datos_muestra = datos_completos[features_esperadas].head(cantidad_muestra)
                 
                 # VERIFICAR VALORES NULOS Y PREPROCESAR
                 if datos_muestra.isnull().any().any():
                     st.warning("Hay valores nulos en los datos. Se rellenarán con 0.")
                     datos_muestra = datos_muestra.fillna(0)
                 
-                with st.spinner('Calculando predicciones de cantidad...'):
+                with st.spinner(f'Calculando predicciones de cantidad para {len(datos_muestra)} clientes...'):
                     pred = modelo.predict(datos_muestra)
                     
                     # Para modelo de cantidad, usar las predicciones directamente como probabilidades
@@ -513,14 +548,20 @@ elif menu == "Modelos":
                     else:
                         pred_proba = pred
 
-            st.success("Predicciones completadas")
+            st.success(f"✅ Predicciones completadas para {len(datos_muestra)} clientes")
             
             # Mostrar información del modelo
-            st.write(f"**Modelo:** {seleccion}")
-            st.write(f"**Features utilizadas:** {len(datos_muestra.columns)}")
-            st.write(f"**Muestras analizadas:** {len(datos_muestra)}")
+            st.write("### Información del Análisis")
+            col_info1, col_info2, col_info3 = st.columns(3)
             
-            # Mostrar datos de entrada
+            with col_info1:
+                st.metric("Modelo seleccionado", seleccion)
+            with col_info2:
+                st.metric("Features utilizadas", len(datos_muestra.columns))
+            with col_info3:
+                st.metric("Muestra analizada", len(datos_muestra))
+            
+            # Mostrar datos de entrada (mantener 10 filas para visualización)
             st.write("### Datos de Entrada (primeras 10 filas)")
             st.dataframe(datos_muestra.head(10))
 
