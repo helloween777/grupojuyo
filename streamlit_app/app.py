@@ -136,7 +136,7 @@ if menu == "Mapa":
                         st.pyplot(fig_productos)
                 
                 # Información detallada
-                with st.expander("📊 Ver detalles de las ubicaciones"):
+                with st.expander("Ver detalles de las ubicaciones"):
                     st.write("**Resumen de coordenadas:**")
                     st.write(f"- Latitud mínima: {coords['lat'].min():.4f}")
                     st.write(f"- Latitud máxima: {coords['lat'].max():.4f}")
