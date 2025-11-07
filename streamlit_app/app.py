@@ -88,7 +88,7 @@ if menu == "Mapa":
                     
                     if len(densidad) > 0:
                         st.map(densidad, size='count', color='#00CC96')
-                        st.caption("Áreas con mayor densidad de ventas (puntos agrupados)")
+                        st.caption("Áreas con mayor densidad de ventas")
                     else:
                         st.map(coords)
                         st.info("No se detectaron áreas de alta densidad")
