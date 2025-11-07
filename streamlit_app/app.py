@@ -405,14 +405,14 @@ elif menu == "Modelos":
         try:
             # CARGAR DATOS ESPECÍFICOS PARA CADA MODELO
             if seleccion == "Probabilidad de compra":
-                datos_muestra = datos_completos[features_por_modelo['compro']].head(100)
+                datos_muestra = datos_completos[features_por_modelo['compro']].head(1500)
                 modelo_data = cargar_modelo(modelo_path)
                 
                 # Verificar si es diccionario o modelo directo
                 if isinstance(modelo_data, dict) and 'model' in modelo_data:
                     modelo = modelo_data['model']
                     features_esperadas = modelo_data.get('features', features_por_modelo['compro'])
-                    datos_muestra = datos_completos[features_esperadas].head(100)
+                    datos_muestra = datos_completos[features_esperadas].head(1500)
                 else:
                     modelo = modelo_data
                 
@@ -424,13 +424,13 @@ elif menu == "Modelos":
                         pred_proba = pred
 
             elif seleccion == "Día de compra":
-                datos_muestra = datos_completos[features_por_modelo['dia_compra']].head(100)
+                datos_muestra = datos_completos[features_por_modelo['dia_compra']].head(1500)
                 modelo_data = cargar_modelo(modelo_path)
                 
                 if isinstance(modelo_data, dict) and 'model' in modelo_data:
                     modelo = modelo_data['model']
                     features_esperadas = modelo_data.get('features', features_por_modelo['dia_compra'])
-                    datos_muestra = datos_completos[features_esperadas].head(100)
+                    datos_muestra = datos_completos[features_esperadas].head(1500)
                 else:
                     modelo = modelo_data
                 
@@ -452,7 +452,7 @@ elif menu == "Modelos":
                     modelo = modelo_data
                     features_esperadas = features_por_modelo['producto']
                 
-                datos_muestra = datos_completos[features_esperadas].head(100).copy()
+                datos_muestra = datos_completos[features_esperadas].head(1500).copy()
                 
                 # Procesar tipos de datos para CatBoost
                 categorical_cols = ['tipo_cliente', 'producto_favorito_cliente', 
@@ -494,7 +494,7 @@ elif menu == "Modelos":
                     st.error("No hay features disponibles para el modelo de cantidad")
                     st.stop()
                 
-                datos_muestra = datos_completos[features_esperadas].head(100)
+                datos_muestra = datos_completos[features_esperadas].head(1500)
                 
                 # VERIFICAR VALORES NULOS Y PREPROCESAR
                 if datos_muestra.isnull().any().any():
